@@ -20,8 +20,12 @@ import type { LiveSnapshot } from '../store/live.js';
 import { resolvePaths } from '../store/paths.js';
 import type { Paths } from '../store/paths.js';
 import { readSessions } from '../store/sessions.js';
+import { loadSettings, saveSettings } from '../store/settings.js';
+import { applySetting, resetSetting } from '../core/settings.js';
+import type { Settings } from '../core/settings.js';
 import { parseCommand } from './args.js';
-import type { Command } from './args.js';
+import type { Command, CountOverride } from './args.js';
+import { renderSettings } from './settings-view.js';
 import { renderDoctor, runDoctor } from './doctor.js';
 import { install, packageRoot } from './install.js';
 import { renderStatusline, statuslineJson } from './statusline.js';
@@ -37,12 +41,15 @@ const HELP = `playtime - Steam-style playtime tracking for CLI agent harnesses
   playtime harness <name>      drill into claude-code, codex or opencode
 
   playtime statusline          one compact line, for ccstatusline
+  playtime config              show and change settings
   playtime install             wire up every harness found
   playtime doctor              check hooks, daemon and stored history
   playtime daemon              start the tracker if it is not running
 
 Options
   --json                       machine-readable output
+  --stacked                    add overlapping sessions up
+  --wallclock                  count overlapping sessions once
   --format <template>          statusline layout, for example "{open} / {busy}"
   --width <n>                  statusline width budget
   --harness <name>             limit install to one harness
@@ -72,12 +79,18 @@ async function load(paths: Paths): Promise<Loaded> {
   return { records: [...stored.items, ...provisional], live };
 }
 
-function context(command: Extract<Command, { window: unknown }>, now: number): ViewContext {
+function context(
+  command: Extract<Command, { window: unknown }>,
+  settings: Settings,
+  now: number,
+): ViewContext {
   return {
     now,
     home: homedir(),
     width: process.stdout.columns ?? 80,
     window: command.window,
+    count: command.count ?? settings.count,
+    projectLimit: settings['projects.limit'],
     color: Boolean(process.stdout.isTTY) && process.env['NO_COLOR'] === undefined,
   };
 }
@@ -99,7 +112,11 @@ async function readStdinJson(): Promise<Record<string, unknown> | null> {
   }
 }
 
-async function statusline(paths: Paths, command: Extract<Command, { kind: 'statusline' }>) {
+async function statusline(
+  paths: Paths,
+  command: Extract<Command, { kind: 'statusline' }>,
+  settings: Settings,
+) {
   const snapshot = await readLive(paths);
 
   if (command.json) {
@@ -112,14 +129,43 @@ async function statusline(paths: Paths, command: Extract<Command, { kind: 'statu
   const width =
     command.width ?? (typeof fromStdin === 'number' ? fromStdin : process.stdout.columns);
 
-  const line = renderStatusline(snapshot, { format: command.format, width });
+  const line = renderStatusline(snapshot, {
+    format: command.format ?? settings['statusline.format'],
+    window: settings['statusline.window'],
+    count: settings.count,
+    width,
+  });
   process.stdout.write(line === '' ? '' : `${line}\n`);
+}
+
+async function config(command: Extract<Command, { kind: 'config' }>): Promise<number> {
+  const loaded = await loadSettings();
+
+  if (command.action === 'show') {
+    process.stdout.write(renderSettings(loaded));
+    return 0;
+  }
+
+  const result =
+    command.action === 'set'
+      ? applySetting(loaded.settings, command.key, command.value)
+      : resetSetting(loaded.settings, command.key);
+
+  if (!result.ok) {
+    process.stderr.write(`playtime: ${result.error}\n`);
+    return 2;
+  }
+
+  await saveSettings(loaded.path, result.settings);
+  process.stdout.write(`${command.key} is now ${String(result.settings[command.key as keyof Settings])}\n`);
+  return 0;
 }
 
 async function main(): Promise<number> {
   const command = parseCommand(process.argv.slice(2));
   const paths = resolvePaths();
   const now = Date.now();
+  const { settings } = await loadSettings();
 
   switch (command.kind) {
     case 'error':
@@ -135,8 +181,11 @@ async function main(): Promise<number> {
       return 0;
 
     case 'statusline':
-      await statusline(paths, command);
+      await statusline(paths, command, settings);
       return 0;
+
+    case 'config':
+      return config(command);
 
     case 'doctor':
       process.stdout.write(renderDoctor(await runDoctor(paths, now)));
@@ -171,7 +220,7 @@ async function main(): Promise<number> {
       }
 
       try {
-        await runDaemon(paths, configFromEnv(), {
+        await runDaemon(paths, configFromEnv(process.env, settings), {
           now: Date.now,
           isAlive: aliveProbe,
           pid: process.pid,
@@ -191,7 +240,7 @@ async function main(): Promise<number> {
         return 0;
       }
 
-      process.stdout.write(renderLibrary(data, live, context(command, now)));
+      process.stdout.write(renderLibrary(data, live, context(command, settings, now)));
       return 0;
     }
 
@@ -206,7 +255,7 @@ async function main(): Promise<number> {
       }
 
       process.stdout.write(
-        renderDetail(HARNESS_LABELS[command.harness], data, context(command, now)),
+        renderDetail(HARNESS_LABELS[command.harness], data, context(command, settings, now)),
       );
       return 0;
     }
@@ -237,7 +286,7 @@ async function main(): Promise<number> {
       }
 
       process.stdout.write(
-        renderDetail(displayProject(selection.project, homedir()), data, context(command, now)),
+        renderDetail(displayProject(selection.project, homedir()), data, context(command, settings, now)),
       );
       return 0;
     }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { concurrency, rollup } from './rollup.js';
+import { concurrency, measure, rollup } from './rollup.js';
 import type { SessionRecord } from './session.js';
 import type { Harness } from './events.js';
 
@@ -182,4 +182,58 @@ test('concurrency is the ratio of session time to wall clock', () => {
 
 test('concurrency of nothing is zero rather than infinity', () => {
   assert.equal(concurrency(rollup([]).total), 0);
+});
+
+test('stacked totals add overlapping sessions up instead of unioning them', () => {
+  const result = rollup([
+    session({ from: BASE, to: BASE + HOUR, busy: [[BASE, BASE + HOUR]] }),
+    session({ from: BASE, to: BASE + HOUR, busy: [[BASE, BASE + HOUR]] }),
+    session({ from: BASE, to: BASE + HOUR, busy: [[BASE, BASE + HOUR]] }),
+  ]);
+
+  assert.equal(measure(result.total, 'wallclock').open, HOUR);
+  assert.equal(measure(result.total, 'stacked').open, 3 * HOUR);
+  assert.equal(measure(result.total, 'wallclock').busy, HOUR);
+  assert.equal(measure(result.total, 'stacked').busy, 3 * HOUR);
+});
+
+test('stacked blocked time is summed the same way', () => {
+  const result = rollup([
+    session({ from: BASE, to: BASE + HOUR, blocked: [[BASE, BASE + 0.5 * HOUR]] }),
+    session({ from: BASE, to: BASE + HOUR, blocked: [[BASE, BASE + 0.5 * HOUR]] }),
+  ]);
+
+  assert.equal(measure(result.total, 'wallclock').blocked, 0.5 * HOUR);
+  assert.equal(measure(result.total, 'stacked').blocked, HOUR);
+});
+
+test('with no overlap the two modes agree', () => {
+  const result = rollup([
+    session({ from: BASE, to: BASE + HOUR, busy: [[BASE, BASE + 0.5 * HOUR]] }),
+    session({ from: BASE + 5 * HOUR, to: BASE + 6 * HOUR }),
+  ]);
+
+  assert.deepEqual(measure(result.total, 'stacked'), measure(result.total, 'wallclock'));
+});
+
+test('stacked totals are clipped by a window like every other total', () => {
+  const result = rollup(
+    [
+      session({ from: BASE - 2 * HOUR, to: BASE + 2 * HOUR }),
+      session({ from: BASE - 2 * HOUR, to: BASE + 2 * HOUR }),
+    ],
+    [BASE, BASE + DAY],
+  );
+
+  assert.equal(measure(result.total, 'stacked').open, 4 * HOUR);
+});
+
+test('harness and project rows carry stacked totals too', () => {
+  const result = rollup([
+    session({ project: '/a', from: BASE, to: BASE + HOUR }),
+    session({ project: '/a', from: BASE, to: BASE + HOUR }),
+  ]);
+
+  assert.equal(measure(result.harnesses[0]!, 'stacked').open, 2 * HOUR);
+  assert.equal(measure(result.projects[0]!, 'stacked').open, 2 * HOUR);
 });

@@ -49,6 +49,8 @@ const EMPTY_TOTALS = {
   busy: 0,
   blocked: 0,
   sessionTime: 0,
+  busyStacked: 0,
+  blockedStacked: 0,
   sessions: 0,
   turns: 0,
 };

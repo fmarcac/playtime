@@ -11,7 +11,13 @@ import type { LiveSnapshot } from '../store/live.js';
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date('2026-07-25T18:00:00').getTime();
 
-const CTX: ViewContext = { now: NOW, home: '/home/dev', width: 100, window: 'all' };
+const CTX: ViewContext = {
+  now: NOW,
+  home: '/home/dev',
+  width: 100,
+  window: 'all',
+  count: 'wallclock',
+};
 
 let counter = 0;
 
@@ -39,7 +45,16 @@ function session(options: {
 }
 
 function emptySnapshot(sessions: LiveSnapshot['sessions']): LiveSnapshot {
-  const zero = { open: 0, busy: 0, blocked: 0, sessionTime: 0, sessions: 0, turns: 0 };
+  const zero = {
+    open: 0,
+    busy: 0,
+    blocked: 0,
+    sessionTime: 0,
+    busyStacked: 0,
+    blockedStacked: 0,
+    sessions: 0,
+    turns: 0,
+  };
   return {
     v: 1,
     updatedAt: NOW,
@@ -273,4 +288,56 @@ test('a detail view breaks the time down by harness', () => {
 
 test('a detail view with nothing in it says so', () => {
   assert.match(renderDetail('~/git/nothing', rollup([]), CTX), /No playtime recorded/i);
+});
+
+const STACKED: ViewContext = { ...CTX, count: 'stacked' };
+
+test('stacked mode adds concurrent sessions up instead of unioning them', () => {
+  const overlapping = [session({ hours: 4, busyHours: 2 }), session({ hours: 4, busyHours: 2 })];
+
+  assert.match(renderLibrary(rollup(overlapping), null, CTX), /4h 00m open/);
+  assert.match(renderLibrary(rollup(overlapping), null, STACKED), /8h 00m open/);
+});
+
+test('stacked mode says so in the header, so the number is never ambiguous', () => {
+  assert.match(renderLibrary(rollup([session({ hours: 4 })]), null, STACKED), /stacked/);
+  assert.doesNotMatch(renderLibrary(rollup([session({ hours: 4 })]), null, CTX), /stacked/);
+});
+
+test('stacked mode reports the wall clock underneath rather than the overlap ratio', () => {
+  const output = renderLibrary(
+    rollup([session({ hours: 4 }), session({ hours: 4 })]),
+    null,
+    STACKED,
+  );
+
+  assert.match(output, /4h 00m of wall clock underneath/);
+  assert.doesNotMatch(output, /fit inside that/);
+});
+
+test('stacked mode also stacks the harness rows and project rows', () => {
+  const output = renderLibrary(
+    rollup([
+      session({ project: '/home/dev/dup', hours: 3 }),
+      session({ project: '/home/dev/dup', hours: 3 }),
+    ]),
+    null,
+    STACKED,
+  );
+
+  const harnessRow = output.split('\n').find((line) => line.includes('Claude Code')) ?? '';
+  const projectRow = output.split('\n').find((line) => line.includes('~/dup')) ?? '';
+
+  assert.match(harnessRow, /6h 00m/);
+  assert.match(projectRow, /6h 00m/);
+});
+
+test('the project list honours the configured row limit', () => {
+  const many = Array.from({ length: 8 }, (_, index) =>
+    session({ project: `/home/dev/p${index}`, hours: 8 - index }),
+  );
+
+  const output = renderLibrary(rollup(many), null, { ...CTX, projectLimit: 3 });
+
+  assert.match(output, /and 5 more/);
 });

@@ -9,7 +9,17 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
 function totals(partial: Partial<Totals> = {}): Totals {
-  return { open: 0, busy: 0, blocked: 0, sessionTime: 0, sessions: 0, turns: 0, ...partial };
+  return {
+    open: 0,
+    busy: 0,
+    blocked: 0,
+    sessionTime: 0,
+    busyStacked: 0,
+    blockedStacked: 0,
+    sessions: 0,
+    turns: 0,
+    ...partial,
+  };
 }
 
 function snapshot(partial: Partial<LiveSnapshot> = {}): LiveSnapshot {
@@ -98,4 +108,13 @@ test('json output for a missing snapshot is still valid json', () => {
   const parsed = JSON.parse(statuslineJson(null)) as Record<string, unknown>;
 
   assert.equal(parsed['available'], false);
+});
+
+test('stacked mode reports summed time rather than deduplicated time', () => {
+  const stacked = snapshot({
+    today: totals({ open: HOUR, busy: 30 * MINUTE, sessionTime: 3 * HOUR, busyStacked: 90 * MINUTE }),
+  });
+
+  assert.equal(renderStatusline(stacked, { count: 'wallclock' }), '1h00m open · 30m busy');
+  assert.equal(renderStatusline(stacked, { count: 'stacked' }), '3h00m open · 1h30m busy');
 });

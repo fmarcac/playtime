@@ -10,6 +10,7 @@ import { clip, normalize, total } from './intervals.js';
 import type { Interval } from './intervals.js';
 import type { Harness } from './events.js';
 import type { SessionRecord } from './session.js';
+import type { CountMode } from './settings.js';
 
 export interface Totals {
   /** Deduplicated wall-clock time the harness was open. */
@@ -20,8 +21,27 @@ export interface Totals {
   blocked: number;
   /** Undeduplicated sum of session durations. Divided by open, this is concurrency. */
   sessionTime: number;
+  /** Busy and blocked time summed per session rather than unioned. */
+  busyStacked: number;
+  blockedStacked: number;
   sessions: number;
   turns: number;
+}
+
+/**
+ * Picks the trio of durations a view should show.
+ *
+ * Both are always computed, so the counting mode is purely a presentation
+ * choice and switching it never needs the history re-read.
+ */
+export function measure(
+  totals: Totals,
+  mode: CountMode,
+): { open: number; busy: number; blocked: number } {
+  if (mode === 'stacked') {
+    return { open: totals.sessionTime, busy: totals.busyStacked, blocked: totals.blockedStacked };
+  }
+  return { open: totals.open, busy: totals.busy, blocked: totals.blocked };
 }
 
 export interface HarnessRollup extends Totals {
@@ -47,6 +67,8 @@ interface Bucket {
   busy: Interval[];
   blocked: Interval[];
   sessionTime: number;
+  busyStacked: number;
+  blockedStacked: number;
   sessions: number;
   turns: number;
   lastPlayed: number | null;
@@ -59,6 +81,8 @@ function emptyBucket(): Bucket {
     busy: [],
     blocked: [],
     sessionTime: 0,
+    busyStacked: 0,
+    blockedStacked: 0,
     sessions: 0,
     turns: 0,
     lastPlayed: null,
@@ -80,6 +104,8 @@ function accumulate(bucket: Bucket, session: ClippedSession): void {
   bucket.busy.push(...session.busy);
   bucket.blocked.push(...session.blocked);
   bucket.sessionTime += total(session.open);
+  bucket.busyStacked += total(session.busy);
+  bucket.blockedStacked += total(session.blocked);
   bucket.sessions += 1;
   bucket.turns += session.turns;
   bucket.harnesses.add(session.harness);
@@ -94,6 +120,8 @@ function totals(bucket: Bucket): Totals {
     busy: total(bucket.busy),
     blocked: total(bucket.blocked),
     sessionTime: bucket.sessionTime,
+    busyStacked: bucket.busyStacked,
+    blockedStacked: bucket.blockedStacked,
     sessions: bucket.sessions,
     turns: bucket.turns,
   };

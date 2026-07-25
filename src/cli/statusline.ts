@@ -9,15 +9,12 @@ import { basename } from 'node:path';
 
 import { HARNESS_LABELS } from '../core/events.js';
 import { formatCompact } from '../core/format.js';
-import { concurrency } from '../core/rollup.js';
+import { concurrency, measure } from '../core/rollup.js';
+import { DEFAULT_STATUSLINE_FORMAT } from '../core/settings.js';
+import type { CountMode, StatuslineWindow } from '../core/settings.js';
 import type { LiveSnapshot } from '../store/live.js';
 
-/**
- * Both numbers carry their own label. A status line is read at a glance and out
- * of context, so a bare glyph between two durations tells you nothing about
- * which is which.
- */
-export const DEFAULT_STATUSLINE_FORMAT = '{open} open · {busy} busy';
+export { DEFAULT_STATUSLINE_FORMAT };
 
 /** What the default format degrades to when the terminal cannot fit it. */
 const NARROW_FORMAT = '{open} open';
@@ -27,22 +24,29 @@ export interface StatuslineOptions {
   /** Terminal width, which ccstatusline supplies on stdin. */
   width?: number | undefined;
   /** Window whose totals the bare tokens refer to. */
-  window?: 'today' | 'week' | 'allTime' | undefined;
+  window?: StatuslineWindow | undefined;
+  count?: CountMode | undefined;
 }
 
-function fill(format: string, snapshot: LiveSnapshot, window: 'today' | 'week' | 'allTime'): string {
+function fill(
+  format: string,
+  snapshot: LiveSnapshot,
+  window: StatuslineWindow,
+  count: CountMode,
+): string {
   const totals = snapshot[window];
+  const shown = measure(totals, count);
 
   // With several sessions live, the newest is the one you are most likely looking at.
   const current = [...snapshot.sessions].sort((a, b) => b.startedAt - a.startedAt)[0];
 
   const values: Record<string, string> = {
-    open: formatCompact(totals.open),
-    busy: formatCompact(totals.busy),
-    blocked: formatCompact(totals.blocked),
+    open: formatCompact(shown.open),
+    busy: formatCompact(shown.busy),
+    blocked: formatCompact(shown.blocked),
     sessions: String(totals.sessions),
     turns: String(totals.turns),
-    total: formatCompact(snapshot.allTime.open),
+    total: formatCompact(measure(snapshot.allTime, count).open),
     concurrency: `${concurrency(totals).toFixed(1)}x`,
     live: String(snapshot.sessions.length),
     project: current ? basename(current.project) : '',
@@ -60,12 +64,13 @@ export function renderStatusline(
   if (!snapshot) return '';
 
   const window = options.window ?? 'today';
-  const rendered = fill(options.format ?? DEFAULT_STATUSLINE_FORMAT, snapshot, window);
+  const count = options.count ?? 'wallclock';
+  const rendered = fill(options.format ?? DEFAULT_STATUSLINE_FORMAT, snapshot, window, count);
 
   // A format the user chose is theirs to fit; only the default is allowed to shrink.
   const shrinkable = options.format === undefined && options.width !== undefined;
   if (shrinkable && rendered.length > (options.width ?? Infinity)) {
-    return fill(NARROW_FORMAT, snapshot, window);
+    return fill(NARROW_FORMAT, snapshot, window, count);
   }
 
   return rendered;

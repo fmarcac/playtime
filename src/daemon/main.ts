@@ -3,6 +3,7 @@
 
 import { acquireLock } from '../store/lock.js';
 import { resolvePaths } from '../store/paths.js';
+import { loadSettings } from '../store/settings.js';
 import { configFromEnv, runDaemon } from './daemon.js';
 import { aliveProbe, processStartTime } from './proc.js';
 
@@ -24,7 +25,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 try {
   await runDaemon(
     paths,
-    configFromEnv(),
+    configFromEnv(process.env, (await loadSettings()).settings),
     { now: Date.now, isAlive: aliveProbe, pid: process.pid },
     controller.signal,
   );

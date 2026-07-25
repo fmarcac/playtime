@@ -9,8 +9,9 @@ import {
   formatRelative,
   plural,
 } from '../core/format.js';
-import { concurrency } from '../core/rollup.js';
+import { concurrency, measure } from '../core/rollup.js';
 import type { HarnessRollup, ProjectRollup, Rollup, Totals } from '../core/rollup.js';
+import type { CountMode } from '../core/settings.js';
 import type { LiveSnapshot } from '../store/live.js';
 import type { WindowKind } from '../core/window.js';
 
@@ -20,6 +21,8 @@ export interface ViewContext {
   home: string;
   width: number;
   window: WindowKind;
+  count: CountMode;
+  projectLimit?: number | undefined;
   color?: boolean | undefined;
 }
 
@@ -30,7 +33,7 @@ const WINDOW_LABELS: Record<WindowKind, string> = {
   month: 'past 30 days',
 };
 
-const MAX_PROJECT_ROWS = 12;
+const DEFAULT_PROJECT_ROWS = 12;
 const BAR_WIDTH = 18;
 
 const DIM = '2';
@@ -45,6 +48,12 @@ function paint(text: string, code: string, ctx: ViewContext): string {
 function header(title: string, right: string, ctx: ViewContext): string {
   const gap = Math.max(1, ctx.width - title.length - right.length);
   return `${paint(title, BOLD, ctx)}${' '.repeat(gap)}${paint(right, DIM, ctx)}`;
+}
+
+/** Stacked totals look wrong unless the view says that is what they are. */
+function windowLabel(ctx: ViewContext): string {
+  const window = WINDOW_LABELS[ctx.window];
+  return ctx.count === 'stacked' ? `${window} · stacked` : window;
 }
 
 function widest(values: readonly string[]): number {
@@ -66,10 +75,11 @@ const SEEN_HEADING = 'last used';
 function harnessTable(harnesses: readonly HarnessRollup[], ctx: ViewContext): string[] {
   if (harnesses.length === 0) return [];
 
+  const measured = harnesses.map((row) => measure(row, ctx.count));
   const labels = harnesses.map((row) => HARNESS_LABELS[row.harness]);
-  const opens = harnesses.map((row) => formatDuration(row.open));
-  const busies = harnesses.map((row) => formatDuration(row.busy));
-  const shares = harnesses.map((row) => formatPercent(row.busy, row.open));
+  const opens = measured.map((row) => formatDuration(row.open));
+  const busies = measured.map((row) => formatDuration(row.busy));
+  const shares = measured.map((row) => formatPercent(row.busy, row.open));
   const seens = harnesses.map((row) => formatRelative(row.lastPlayed, ctx.now));
 
   const labelWidth = widest(labels);
@@ -101,18 +111,20 @@ function harnessTable(harnesses: readonly HarnessRollup[], ctx: ViewContext): st
 }
 
 function projectRows(projects: readonly ProjectRollup[], ctx: ViewContext): string[] {
-  const shown = projects.slice(0, MAX_PROJECT_ROWS);
+  const shown = projects.slice(0, ctx.projectLimit ?? DEFAULT_PROJECT_ROWS);
   const names = shown.map((row) => displayProject(row.project, ctx.home));
-  const opens = shown.map((row) => formatDuration(row.open));
+  const values = shown.map((row) => measure(row, ctx.count).open);
+  const opens = values.map(formatDuration);
 
   const nameWidth = Math.min(widest(names), Math.max(20, ctx.width - 34));
   const openWidth = widest(opens);
-  const most = shown[0]?.open ?? 0;
+  const most = values[0] ?? 0;
 
-  const rows = shown.map((row, index) => {
+  const rows = shown.map((_, index) => {
     const name = (names[index] ?? '').padEnd(nameWidth);
     const open = (opens[index] ?? '').padStart(openWidth);
-    return `    ${name}  ${open}  ${paint(bar(row.open, most, BAR_WIDTH), DIM, ctx)}`;
+    const width = bar(values[index] ?? 0, most, BAR_WIDTH);
+    return `    ${name}  ${open}  ${paint(width, DIM, ctx)}`;
   });
 
   const hidden = projects.length - shown.length;
@@ -127,19 +139,24 @@ function projectRows(projects: readonly ProjectRollup[], ctx: ViewContext): stri
  * concurrently, no waiting line when nothing ever blocked.
  */
 function footer(totals: Totals, ctx: ViewContext): string[] {
-  const share = formatPercent(totals.busy, totals.open);
-  let headline = `${formatDuration(totals.open)} open, agent working ${formatDuration(totals.busy)} of it (${share})`;
+  const shown = measure(totals, ctx.count);
+  const share = formatPercent(shown.busy, shown.open);
 
-  if (totals.blocked > 0) {
-    headline += `, ${formatDuration(totals.blocked)} of that waiting on you`;
+  let headline = `${formatDuration(shown.open)} open, agent working ${formatDuration(shown.busy)} of it (${share})`;
+  if (shown.blocked > 0) {
+    headline += `, ${formatDuration(shown.blocked)} of that waiting on you`;
   }
 
   const lines = [headline];
-
   const overlap = concurrency(totals);
+
+  // Each mode explains itself in terms of the other, so the relationship
+  // between the two totals is always on screen.
   if (overlap > 1.05) {
     lines.push(
-      `${formatDuration(totals.sessionTime)} of sessions fit inside that, ${overlap.toFixed(1)} running at once`,
+      ctx.count === 'stacked'
+        ? `${formatDuration(totals.open)} of wall clock underneath, ${overlap.toFixed(1)} running at once`
+        : `${formatDuration(totals.sessionTime)} of sessions fit inside that, ${overlap.toFixed(1)} running at once`,
     );
   }
 
@@ -167,7 +184,7 @@ export function renderLibrary(
   live: LiveSnapshot | null,
   ctx: ViewContext,
 ): string {
-  const lines = [header('PLAYTIME', WINDOW_LABELS[ctx.window], ctx), ''];
+  const lines = [header('PLAYTIME', windowLabel(ctx), ctx), ''];
 
   if (data.total.sessions === 0) {
     lines.push(...nothingYet(ctx));
@@ -186,7 +203,7 @@ export function renderLibrary(
 }
 
 export function renderDetail(title: string, data: Rollup, ctx: ViewContext): string {
-  const lines = [header(title, WINDOW_LABELS[ctx.window], ctx), ''];
+  const lines = [header(title, windowLabel(ctx), ctx), ''];
 
   if (data.total.sessions === 0) {
     lines.push('  No playtime recorded for this one yet.');

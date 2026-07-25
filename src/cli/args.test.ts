@@ -4,17 +4,17 @@ import assert from 'node:assert/strict';
 import { parseCommand } from './args.js';
 
 test('no arguments shows the whole library', () => {
-  assert.deepEqual(parseCommand([]), { kind: 'library', window: 'all', json: false });
+  assert.deepEqual(parseCommand([]), { kind: 'library', window: 'all', json: false, count: undefined });
 });
 
 test('a window name narrows the library', () => {
   assert.equal(parseCommand(['today']).kind, 'library');
-  assert.deepEqual(parseCommand(['week']), { kind: 'library', window: 'week', json: false });
-  assert.deepEqual(parseCommand(['month']), { kind: 'library', window: 'month', json: false });
+  assert.deepEqual(parseCommand(['week']), { kind: 'library', window: 'week', json: false, count: undefined });
+  assert.deepEqual(parseCommand(['month']), { kind: 'library', window: 'month', json: false, count: undefined });
 });
 
 test('the json flag applies to the library', () => {
-  assert.deepEqual(parseCommand(['--json']), { kind: 'library', window: 'all', json: true });
+  assert.deepEqual(parseCommand(['--json']), { kind: 'library', window: 'all', json: true, count: undefined });
 });
 
 test('a bare word is treated as a project filter', () => {
@@ -23,6 +23,7 @@ test('a bare word is treated as a project filter', () => {
     filter: 'playtime',
     window: 'all',
     json: false,
+    count: undefined,
   });
 });
 
@@ -32,6 +33,7 @@ test('a project filter can be combined with a window', () => {
     filter: 'playtime',
     window: 'week',
     json: false,
+    count: undefined,
   });
 });
 
@@ -41,6 +43,7 @@ test('harness takes a harness name', () => {
     harness: 'codex',
     window: 'all',
     json: false,
+    count: undefined,
   });
 });
 
@@ -133,4 +136,54 @@ test('an unknown flag is reported rather than ignored', () => {
 
   assert.equal(result.kind, 'error');
   assert.match(result.kind === 'error' ? result.message : '', /--wat/);
+});
+
+test('config with no arguments shows the settings page', () => {
+  assert.deepEqual(parseCommand(['config']), { kind: 'config', action: 'show' });
+});
+
+test('config set takes a key and a value', () => {
+  assert.deepEqual(parseCommand(['config', 'set', 'count', 'stacked']), {
+    kind: 'config',
+    action: 'set',
+    key: 'count',
+    value: 'stacked',
+  });
+});
+
+test('config set with no value is an error rather than a silent no-op', () => {
+  assert.equal(parseCommand(['config', 'set', 'count']).kind, 'error');
+});
+
+test('config unset takes a key', () => {
+  assert.deepEqual(parseCommand(['config', 'unset', 'count']), {
+    kind: 'config',
+    action: 'unset',
+    key: 'count',
+  });
+});
+
+test('an unrecognised config action is an error', () => {
+  assert.equal(parseCommand(['config', 'wibble']).kind, 'error');
+});
+
+test('a report can override the counting mode for one run', () => {
+  const stacked = parseCommand(['--stacked']);
+  assert.equal(stacked.kind === 'library' ? stacked.count : null, 'stacked');
+
+  const wall = parseCommand(['--wallclock']);
+  assert.equal(wall.kind === 'library' ? wall.count : null, 'wallclock');
+});
+
+test('without an override the counting mode is left to the settings', () => {
+  const result = parseCommand([]);
+  assert.equal(result.kind === 'library' ? result.count : 'missing', undefined);
+});
+
+test('the counting override reaches project and harness views too', () => {
+  const project = parseCommand(['playtime', '--stacked']);
+  assert.equal(project.kind === 'detail' ? project.count : null, 'stacked');
+
+  const harness = parseCommand(['harness', 'codex', '--stacked']);
+  assert.equal(harness.kind === 'harness' ? harness.count : null, 'stacked');
 });

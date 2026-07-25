@@ -9,6 +9,7 @@ import { total } from '../core/intervals.js';
 import { rollup } from '../core/rollup.js';
 import { finalize } from '../core/session.js';
 import type { SessionRecord, SessionState } from '../core/session.js';
+import type { Settings } from '../core/settings.js';
 import { windowFor } from '../core/window.js';
 import { drainInbox } from '../store/inbox.js';
 import { readLive, writeLive } from '../store/live.js';
@@ -51,13 +52,22 @@ function positiveNumber(raw: string | undefined): number | null {
  * The interpolation clamp follows the tick interval at 2x unless set outright,
  * so shortening the tick does not silently start excluding ordinary gaps.
  */
-export function configFromEnv(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
-  const tickMs = positiveNumber(env['PLAYTIME_TICK_MS']) ?? DEFAULT_DAEMON_CONFIG.tickMs;
+export function configFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  settings?: Pick<Settings, 'daemon.tickMs' | 'daemon.idleExitMs'>,
+): DaemonConfig {
+  const tickMs =
+    positiveNumber(env['PLAYTIME_TICK_MS']) ??
+    settings?.['daemon.tickMs'] ??
+    DEFAULT_DAEMON_CONFIG.tickMs;
 
   return {
     tickMs,
     maxAdvanceMs: positiveNumber(env['PLAYTIME_MAX_ADVANCE_MS']) ?? tickMs * 2,
-    idleExitMs: positiveNumber(env['PLAYTIME_IDLE_EXIT_MS']) ?? DEFAULT_DAEMON_CONFIG.idleExitMs,
+    idleExitMs:
+      positiveNumber(env['PLAYTIME_IDLE_EXIT_MS']) ??
+      settings?.['daemon.idleExitMs'] ??
+      DEFAULT_DAEMON_CONFIG.idleExitMs,
     staleSessionMs:
       positiveNumber(env['PLAYTIME_STALE_SESSION_MS']) ?? DEFAULT_DAEMON_CONFIG.staleSessionMs,
   };

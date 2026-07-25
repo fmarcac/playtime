@@ -135,14 +135,79 @@ test('the footer reports deduplicated open time next to raw session time', () =>
   assert.match(output, /15 turns/);
 });
 
-test('the footer names the concurrency multiplier when sessions overlapped', () => {
+test('the footer explains overlap in words rather than a bare multiplier', () => {
   const output = renderLibrary(
     rollup([session({ hours: 4 }), session({ hours: 4 })]),
     null,
     CTX,
   );
 
-  assert.match(output, /2\.0. sessions deep/);
+  assert.match(output, /8h 00m of sessions fit inside that/);
+  assert.match(output, /2\.0 running at once/);
+});
+
+test('the overlap line is left out when nothing actually overlapped', () => {
+  const output = renderLibrary(rollup([session({ hours: 4 })]), null, CTX);
+
+  assert.doesNotMatch(output, /running at once/);
+});
+
+test('the harness table is introduced by column headers', () => {
+  const output = renderLibrary(rollup([session({ hours: 4, busyHours: 1 })]), null, CTX);
+
+  const header = output.split('\n').find((line) => line.includes('agent busy'));
+
+  assert.ok(header, 'expected a column header row');
+  assert.match(header, /open/);
+  assert.match(header, /last used/);
+});
+
+test('the column headers line up over the values beneath them', () => {
+  const output = renderLibrary(
+    rollup([
+      session({ harness: 'claude-code', hours: 100, busyHours: 40 }),
+      session({ harness: 'codex', hours: 2, project: '/other' }),
+    ]),
+    null,
+    CTX,
+  );
+
+  const lines = output.split('\n');
+  const header = lines.find((line) => line.includes('agent busy')) ?? '';
+  const row = lines.find((line) => line.includes('Claude Code')) ?? '';
+
+  // Right edges must agree, otherwise the table reads as two unrelated blocks.
+  assert.equal(header.indexOf('open') + 'open'.length, row.indexOf('100h 00m') + '100h 00m'.length);
+  assert.equal(header.trimEnd().length, row.trimEnd().length);
+});
+
+test('the footer says how much of the busy time was spent waiting on you', () => {
+  const start = NOW - 4 * HOUR;
+  const output = renderLibrary(
+    rollup([
+      {
+        id: 'blocked-one',
+        harness: 'claude-code',
+        project: '/home/dev/git/playtime',
+        start,
+        end: NOW,
+        open: [[start, NOW]],
+        busy: [[start, start + 2 * HOUR]],
+        blocked: [[start, start + HOUR]],
+        turns: 3,
+      },
+    ]),
+    null,
+    CTX,
+  );
+
+  assert.match(output, /1h 00m of that waiting on you/);
+});
+
+test('the waiting clause is left out when nothing ever blocked', () => {
+  const output = renderLibrary(rollup([session({ hours: 4, busyHours: 1 })]), null, CTX);
+
+  assert.doesNotMatch(output, /waiting on you/);
 });
 
 test('a live session is called out as now playing', () => {

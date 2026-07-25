@@ -30,8 +30,8 @@ test('no snapshot renders nothing, so a status line shows no error', () => {
   assert.equal(renderStatusline(null), '');
 });
 
-test('the default format shows today open time and busy time', () => {
-  assert.equal(renderStatusline(snapshot()), '⏱ 4h12m ▸ 1h07m');
+test('the default format labels both numbers rather than using a glyph', () => {
+  assert.equal(renderStatusline(snapshot()), '4h12m open · 1h07m busy');
 });
 
 test('a custom format substitutes the tokens it names', () => {
@@ -78,12 +78,12 @@ test('the project token is blank when nothing is live', () => {
   assert.equal(renderStatusline(snapshot(), { format: '{project}' }), '');
 });
 
-test('a narrow terminal falls back to open time alone', () => {
-  assert.equal(renderStatusline(snapshot(), { width: 12 }), '⏱ 4h12m');
+test('a narrow terminal falls back to open time alone, still labelled', () => {
+  assert.equal(renderStatusline(snapshot(), { width: 12 }), '4h12m open');
 });
 
 test('a wide terminal keeps the full format', () => {
-  assert.equal(renderStatusline(snapshot(), { width: 200 }), '⏱ 4h12m ▸ 1h07m');
+  assert.equal(renderStatusline(snapshot(), { width: 200 }), '4h12m open · 1h07m busy');
 });
 
 test('json output exposes every window', () => {

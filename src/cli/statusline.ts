@@ -12,10 +12,15 @@ import { formatCompact } from '../core/format.js';
 import { concurrency } from '../core/rollup.js';
 import type { LiveSnapshot } from '../store/live.js';
 
-export const DEFAULT_STATUSLINE_FORMAT = '⏱ {open} ▸ {busy}';
+/**
+ * Both numbers carry their own label. A status line is read at a glance and out
+ * of context, so a bare glyph between two durations tells you nothing about
+ * which is which.
+ */
+export const DEFAULT_STATUSLINE_FORMAT = '{open} open · {busy} busy';
 
 /** What the default format degrades to when the terminal cannot fit it. */
-const NARROW_FORMAT = '⏱ {open}';
+const NARROW_FORMAT = '{open} open';
 
 export interface StatuslineOptions {
   format?: string | undefined;

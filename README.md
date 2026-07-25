@@ -8,16 +8,19 @@ this week. Nothing does that for Claude Code, Codex or OpenCode. Playtime does.
 ```
 PLAYTIME                                                        all time
 
-  Claude Code    386h 04m   busy 141h 22m  36%   today
-  Codex           21h 51m   busy   6h 09m  28%   3 days ago
-  OpenCode         4h 23m   busy   1h 02m  23%   2 weeks ago
+                     open   agent busy    last used
+  Claude Code    386h 04m   141h 22m 36%      today
+  Codex           21h 51m     6h 09m 28%  3 days ago
+  OpenCode         4h 23m     1h 02m 23%  2 weeks ago
 
   Hours used
     ~/git/playtime           88h 12m  ██████████████████
     ~/git/dashboard       63h 40m  █████████████
     ~/infra               41h 05m  ████████
 
-  412h 18m open  ·  148h 33m busy  ·  1.4x sessions deep  ·  2,481 turns
+  412h 18m open, agent working 148h 33m of it (36%), 9h 12m of that waiting on you
+  2,910h of sessions fit inside that, 1.4 running at once
+  2,481 turns
 
   now playing  Claude Code  ~/git/playtime  2h 14m · working
 ```
@@ -98,7 +101,7 @@ refresh.
 
 ```sh
 $ playtime statusline
-⏱ 4h12m ▸ 1h07m
+4h12m open · 1h07m busy
 ```
 
 In ccstatusline's editor, add a **Custom Command** widget running
@@ -116,8 +119,8 @@ on:
 }
 ```
 
-ccstatusline passes the terminal width on stdin and the default layout shortens
-itself when there is not enough room. A render takes about 33ms, well inside the
+ccstatusline passes the terminal width on stdin, and the default layout drops to
+`4h12m open` when there is not enough room. A render takes about 33ms, well inside the
 default timeout. When there is no data yet the command prints nothing, and
 ccstatusline hides the widget rather than showing an empty slot.
 

@@ -12,6 +12,15 @@
     "cli"
   ],
   "license": "MIT",
+  "author": "Filip Marcac",
+  "homepage": "https://github.com/fmarcgh/playtime#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fmarcgh/playtime.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fmarcgh/playtime/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"

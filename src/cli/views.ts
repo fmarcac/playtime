@@ -58,24 +58,46 @@ function nothingYet(ctx: ViewContext): string[] {
   ];
 }
 
-function harnessRows(harnesses: readonly HarnessRollup[], ctx: ViewContext): string[] {
+const OPEN_HEADING = 'open';
+const BUSY_HEADING = 'agent busy';
+const SEEN_HEADING = 'last used';
+
+/** The harness table, with a header row so each column says what it is. */
+function harnessTable(harnesses: readonly HarnessRollup[], ctx: ViewContext): string[] {
+  if (harnesses.length === 0) return [];
+
   const labels = harnesses.map((row) => HARNESS_LABELS[row.harness]);
   const opens = harnesses.map((row) => formatDuration(row.open));
   const busies = harnesses.map((row) => formatDuration(row.busy));
+  const shares = harnesses.map((row) => formatPercent(row.busy, row.open));
+  const seens = harnesses.map((row) => formatRelative(row.lastPlayed, ctx.now));
 
   const labelWidth = widest(labels);
-  const openWidth = widest(opens);
-  const busyWidth = widest(busies);
+  const openWidth = Math.max(widest(opens), OPEN_HEADING.length);
+  const shareWidth = widest(shares);
+  // Busy time and its share sit under one heading, so they are laid out as one column.
+  const busyWidth = Math.max(widest(busies) + 2 + shareWidth, BUSY_HEADING.length);
+  const seenWidth = Math.max(widest(seens), SEEN_HEADING.length);
 
-  return harnesses.map((row, index) => {
+  const header = [
+    ' '.repeat(labelWidth),
+    OPEN_HEADING.padStart(openWidth),
+    BUSY_HEADING.padStart(busyWidth),
+    SEEN_HEADING.padStart(seenWidth),
+  ].join('   ');
+
+  const rows = harnesses.map((_, index) => {
     const label = paint((labels[index] ?? '').padEnd(labelWidth), CYAN, ctx);
     const open = (opens[index] ?? '').padStart(openWidth);
-    const busy = `busy ${(busies[index] ?? '').padStart(busyWidth)}`;
-    const share = formatPercent(row.busy, row.open).padStart(4);
-    const seen = formatRelative(row.lastPlayed, ctx.now);
+    const busy = `${busies[index] ?? ''}  ${(shares[index] ?? '').padStart(shareWidth)}`.padStart(
+      busyWidth,
+    );
+    const seen = (seens[index] ?? '').padStart(seenWidth);
 
-    return `  ${label}   ${open}   ${paint(`${busy} ${share}`, DIM, ctx)}   ${paint(seen, DIM, ctx)}`;
+    return `  ${label}   ${open}   ${paint(busy, DIM, ctx)}   ${paint(seen, DIM, ctx)}`;
   });
+
+  return [paint(`  ${header}`, DIM, ctx), ...rows];
 }
 
 function projectRows(projects: readonly ProjectRollup[], ctx: ViewContext): string[] {
@@ -99,14 +121,31 @@ function projectRows(projects: readonly ProjectRollup[], ctx: ViewContext): stri
   return rows;
 }
 
-function footer(totals: Totals, ctx: ViewContext): string {
-  const parts = [
-    `${formatDuration(totals.open)} open`,
-    `${formatDuration(totals.busy)} busy`,
-    `${concurrency(totals).toFixed(1)}x sessions deep`,
-    plural(totals.turns, 'turn'),
-  ];
-  return paint(`  ${parts.join('  ·  ')}`, DIM, ctx);
+/**
+ * The summary, in sentences rather than a row of unlabelled figures. Clauses
+ * that would say nothing are left out: no overlap line when sessions never ran
+ * concurrently, no waiting line when nothing ever blocked.
+ */
+function footer(totals: Totals, ctx: ViewContext): string[] {
+  const share = formatPercent(totals.busy, totals.open);
+  let headline = `${formatDuration(totals.open)} open, agent working ${formatDuration(totals.busy)} of it (${share})`;
+
+  if (totals.blocked > 0) {
+    headline += `, ${formatDuration(totals.blocked)} of that waiting on you`;
+  }
+
+  const lines = [headline];
+
+  const overlap = concurrency(totals);
+  if (overlap > 1.05) {
+    lines.push(
+      `${formatDuration(totals.sessionTime)} of sessions fit inside that, ${overlap.toFixed(1)} running at once`,
+    );
+  }
+
+  lines.push(plural(totals.turns, 'turn'));
+
+  return lines.map((line) => paint(`  ${line}`, DIM, ctx));
 }
 
 function nowPlaying(live: LiveSnapshot, ctx: ViewContext): string[] {
@@ -136,10 +175,10 @@ export function renderLibrary(
     return `${lines.join('\n')}\n`;
   }
 
-  lines.push(...harnessRows(data.harnesses, ctx));
+  lines.push(...harnessTable(data.harnesses, ctx));
   lines.push('', `  ${paint('Hours used', BOLD, ctx)}`);
   lines.push(...projectRows(data.projects, ctx));
-  lines.push('', footer(data.total, ctx));
+  lines.push('', ...footer(data.total, ctx));
 
   if (live) lines.push(...nowPlaying(live, ctx));
 
@@ -154,8 +193,8 @@ export function renderDetail(title: string, data: Rollup, ctx: ViewContext): str
     return `${lines.join('\n')}\n`;
   }
 
-  lines.push(footer(data.total, ctx), '');
-  lines.push(...harnessRows(data.harnesses, ctx));
+  lines.push(...footer(data.total, ctx), '');
+  lines.push(...harnessTable(data.harnesses, ctx));
 
   // A single project adds nothing the title has not already said.
   if (data.projects.length > 1) {

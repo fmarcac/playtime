@@ -61,7 +61,7 @@ function codexHooksPath(env: NodeJS.ProcessEnv): string {
 
 function openCodePluginPath(env: NodeJS.ProcessEnv): string {
   const config = env['XDG_CONFIG_HOME'] ?? join(homedir(), '.config');
-  return join(config, 'opencode', 'plugin', 'playtime.js');
+  return join(config, 'opencode', 'plugins', 'playtime.js');
 }
 
 /**

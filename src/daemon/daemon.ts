@@ -130,7 +130,6 @@ export class Daemon {
     return closed;
   }
 
-  /** True once nothing has been open for longer than the idle timeout. */
   get shouldExit(): boolean {
     if (this.#emptySince === null) return false;
     return this.#deps.now() - this.#emptySince > this.#config.idleExitMs;
@@ -140,7 +139,6 @@ export class Daemon {
     return this.#tracker.size;
   }
 
-  /** Closes and flushes everything still open, for a clean shutdown. */
   async shutdown(): Promise<void> {
     const now = this.#deps.now();
     await this.#record(this.#tracker.closeAll(now));

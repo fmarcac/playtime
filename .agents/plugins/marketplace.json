@@ -1,0 +1,19 @@
+{
+  "name": "playtime",
+  "interface": {
+    "displayName": "Playtime"
+  },
+  "plugins": [
+    {
+      "name": "playtime",
+      "source": {
+        "source": "url",
+        "url": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

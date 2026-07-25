@@ -36,7 +36,6 @@ export function normalize(intervals: Iterable<Interval>): Interval[] {
   return merged;
 }
 
-/** Merges any number of interval lists into one deduplicated set. */
 export function union(...lists: Iterable<Interval>[]): Interval[] {
   const all: Interval[] = [];
   for (const list of lists) {

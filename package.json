@@ -13,13 +13,13 @@
   ],
   "license": "MIT",
   "author": "Filip Marcac",
-  "homepage": "https://github.com/fmarcgh/playtime#readme",
+  "homepage": "https://github.com/fmarcac/playtime#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fmarcgh/playtime.git"
+    "url": "git+https://github.com/fmarcac/playtime.git"
   },
   "bugs": {
-    "url": "https://github.com/fmarcgh/playtime/issues"
+    "url": "https://github.com/fmarcac/playtime/issues"
   },
   "type": "module",
   "engines": {
@@ -38,6 +38,9 @@
     "adapters",
     "hooks",
     ".claude-plugin",
+    ".codex-plugin",
+    ".agents",
+    ".opencode",
     "README.md",
     "LICENSE"
   ],

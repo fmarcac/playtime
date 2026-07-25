@@ -1,5 +1,3 @@
-/** Rendering helpers shared by every CLI view. */
-
 import { startOfDay } from './window.js';
 
 const SECOND = 1000;

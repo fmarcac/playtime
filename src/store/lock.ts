@@ -1,6 +1,7 @@
 import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
+import { processIsAlive } from '../daemon/proc.js';
 import type { Paths } from './paths.js';
 
 export interface LockInfo {
@@ -11,16 +12,6 @@ export interface LockInfo {
 export interface LockHandle {
   info: LockInfo;
   release(): Promise<void>;
-}
-
-function processIsAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // EPERM means the process exists but belongs to another user.
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
 }
 
 export async function readLock(paths: Paths): Promise<LockInfo | null> {

@@ -1,0 +1,19 @@
+{
+  "name": "playtime",
+  "version": "0.1.0",
+  "description": "Steam-style playtime tracking for CLI agent harnesses",
+  "author": {
+    "name": "Filip Marcac"
+  },
+  "homepage": "https://github.com/fmarcac/playtime",
+  "repository": "https://github.com/fmarcac/playtime",
+  "license": "MIT",
+  "keywords": ["playtime", "tracking", "statusline", "metrics"],
+  "hooks": "./hooks/codex-hooks.json",
+  "interface": {
+    "displayName": "Playtime",
+    "shortDescription": "Track hours spent in Codex, deduplicated across concurrent sessions",
+    "developerName": "Filip Marcac",
+    "category": "Developer Tools"
+  }
+}

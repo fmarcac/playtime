@@ -29,7 +29,6 @@ export class Tracker {
     this.#options = options;
   }
 
-  /** Adopts sessions checkpointed by a previous daemon. */
   restore(states: Iterable<SessionState>): void {
     for (const state of states) {
       if (!state.ended) this.#sessions.set(state.id, state);

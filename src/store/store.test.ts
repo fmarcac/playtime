@@ -296,6 +296,44 @@ test('releasing the lock lets the next daemon take it', async () => {
   });
 });
 
+test('concurrent daemons produce exactly one lock holder', async () => {
+  await withTempHome(async (paths) => {
+    const contenders = Array.from({ length: 8 }, (_, index) =>
+      acquireLock(paths, { pid: index + 1, startedAt: index }, () => true),
+    );
+
+    const winners = (await Promise.all(contenders)).filter(Boolean);
+
+    assert.equal(winners.length, 1);
+  });
+});
+
+test('a lock file is never visible before it has been written', async () => {
+  await withTempHome(async (paths) => {
+    // Whoever loses the race must read complete contents, never an empty file,
+    // otherwise it would mistake a lock being taken for a corrupt one and steal it.
+    const [, holder] = await Promise.all([
+      acquireLock(paths, { pid: 1, startedAt: 100 }, () => true),
+      readLock(paths),
+    ]);
+
+    assert.ok(holder === null || typeof holder.pid === 'number');
+    assert.deepEqual(await readLock(paths), { pid: 1, startedAt: 100 });
+  });
+});
+
+test('releasing a lock that another daemon has since taken leaves theirs alone', async () => {
+  await withTempHome(async (paths) => {
+    const first = await acquireLock(paths, { pid: 1, startedAt: 100 }, () => true);
+    const second = await acquireLock(paths, { pid: 2, startedAt: 200 }, (pid) => pid !== 1);
+
+    await first?.release();
+
+    assert.deepEqual(await readLock(paths), { pid: 2, startedAt: 200 });
+    assert.ok(second);
+  });
+});
+
 test('a lock file corrupted on disk does not wedge the daemon out forever', async () => {
   await withTempHome(async (paths) => {
     await writeFile(paths.lock, 'garbage');

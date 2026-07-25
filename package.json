@@ -26,6 +26,8 @@
   "files": [
     "dist",
     "adapters",
+    "hooks",
+    ".claude-plugin",
     "README.md",
     "LICENSE"
   ],

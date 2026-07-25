@@ -1,0 +1,9 @@
+{
+  "name": "playtime",
+  "description": "Steam-style playtime tracking for CLI agent harnesses: deduplicated open time, agent busy time, per-project breakdown",
+  "version": "0.1.0",
+  "homepage": "https://github.com/fmarcgh/playtime",
+  "repository": "https://github.com/fmarcgh/playtime",
+  "license": "MIT",
+  "keywords": ["playtime", "statusline", "ccstatusline", "tracking", "metrics"]
+}

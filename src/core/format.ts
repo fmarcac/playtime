@@ -52,6 +52,10 @@ export function formatRelative(ts: number | null, now: number): string {
   return `${months} month${months === 1 ? '' : 's'} ago`;
 }
 
+export function plural(count: number, word: string): string {
+  return `${count.toLocaleString('en-US')} ${word}${count === 1 ? '' : 's'}`;
+}
+
 export function formatPercent(part: number, whole: number): string {
   if (whole <= 0) return '0%';
   return `${Math.round((part / whole) * 100)}%`;

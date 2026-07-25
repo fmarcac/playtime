@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bar, displayProject, formatCompact, formatDuration, formatPercent, formatRelative } from './format.js';
+import {
+  bar,
+  displayProject,
+  formatCompact,
+  formatDuration,
+  formatPercent,
+  formatRelative,
+  plural,
+} from './format.js';
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -74,6 +82,16 @@ test('bars scale to the widest value', () => {
 
 test('a nonzero value always draws at least one block', () => {
   assert.equal(bar(1, 1000, 10), '▏');
+});
+
+test('counts are pluralised', () => {
+  assert.equal(plural(1, 'turn'), '1 turn');
+  assert.equal(plural(2, 'turn'), '2 turns');
+  assert.equal(plural(0, 'turn'), '0 turns');
+});
+
+test('large counts get thousands separators', () => {
+  assert.equal(plural(2481, 'turn'), '2,481 turns');
 });
 
 test('project paths under home are shown with a tilde', () => {

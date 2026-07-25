@@ -25,6 +25,7 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.test.*",
     "adapters",
     "hooks",
     ".claude-plugin",
@@ -35,7 +36,7 @@
     "build": "tsc -p tsconfig.json && node scripts/postbuild.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test \"dist/**/*.test.js\"",
-    "prepublishOnly": "npm run build"
+    "prepare": "npm run build"
   },
   "dependencies": {},
   "devDependencies": {

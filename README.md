@@ -41,16 +41,37 @@ more than two at once.
 
 ## Install
 
+Not published to npm yet, so install it from a clone:
+
 ```sh
-npm install -g harness-playtime
+git clone https://github.com/fmarcgh/playtime && cd playtime
+npm install          # builds via the prepare step
+npm link             # puts `playtime` on your PATH
 playtime install
 ```
 
-That wires up every harness it can find, backing up each settings file first.
-Restart any running sessions to pick the hooks up, then check it took:
+`npm link` symlinks the checkout, so a later `git pull && npm run build` updates
+the installed command in place. To install a fixed copy instead, use
+`npm pack` and then `npm install -g ./harness-playtime-*.tgz`. Once published,
+this all collapses to `npm install -g harness-playtime`.
+
+`playtime install` wires up every harness it can find, backing up each settings
+file first. Restart any running sessions to pick the hooks up, then check it
+took:
 
 ```sh
 playtime doctor
+```
+
+```
+PLAYTIME DOCTOR
+
+  ✓ data directory     ~/.local/share/playtime
+  ✓ daemon             pid 769937, last tick 6s ago
+  ✓ Claude Code hooks  ~/.claude/settings.json
+  ! Codex hooks        no config at ~/.codex/hooks.json
+  ✓ history            41 sessions, most recent today
+  ✓ inbox              empty
 ```
 
 To install for only one harness, use `playtime install --harness codex`. To see
@@ -80,9 +101,25 @@ $ playtime statusline
 ⏱ 4h12m ▸ 1h07m
 ```
 
-In ccstatusline, add a **Custom Command** widget running `playtime statusline`.
-ccstatusline passes the terminal width on stdin, and the default layout shortens
-itself when there is not enough room.
+In ccstatusline's editor, add a **Custom Command** widget running
+`playtime statusline`. Or add it straight to
+`~/.config/ccstatusline/settings.json`, appended to whichever line you want it
+on:
+
+```json
+{
+  "id": "a-unique-id",
+  "type": "custom-command",
+  "commandPath": "playtime statusline",
+  "timeout": 3000,
+  "color": "gradient:summer"
+}
+```
+
+ccstatusline passes the terminal width on stdin and the default layout shortens
+itself when there is not enough room. A render takes about 33ms, well inside the
+default timeout. When there is no data yet the command prints nothing, and
+ccstatusline hides the widget rather than showing an empty slot.
 
 To change the layout, pass a template:
 

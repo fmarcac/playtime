@@ -11,7 +11,7 @@ import { rollup } from '../core/rollup.js';
 import { finalize } from '../core/session.js';
 import type { SessionRecord } from '../core/session.js';
 import { windowFor } from '../core/window.js';
-import { DEFAULT_DAEMON_CONFIG, runDaemon } from '../daemon/daemon.js';
+import { configFromEnv, runDaemon } from '../daemon/daemon.js';
 import { aliveProbe, processStartTime } from '../daemon/proc.js';
 import { ensureDaemon } from '../daemon/spawn.js';
 import { acquireLock } from '../store/lock.js';
@@ -171,7 +171,7 @@ async function main(): Promise<number> {
       }
 
       try {
-        await runDaemon(paths, DEFAULT_DAEMON_CONFIG, {
+        await runDaemon(paths, configFromEnv(), {
           now: Date.now,
           isAlive: aliveProbe,
           pid: process.pid,

@@ -38,6 +38,31 @@ export interface DaemonDeps {
   pid?: number;
 }
 
+function positiveNumber(raw: string | undefined): number | null {
+  if (raw === undefined) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * Cadence overrides, mostly so the daemon can be driven quickly in tests and
+ * tuned by anyone who wants finer or coarser sampling.
+ *
+ * The interpolation clamp follows the tick interval at 2x unless set outright,
+ * so shortening the tick does not silently start excluding ordinary gaps.
+ */
+export function configFromEnv(env: NodeJS.ProcessEnv = process.env): DaemonConfig {
+  const tickMs = positiveNumber(env['PLAYTIME_TICK_MS']) ?? DEFAULT_DAEMON_CONFIG.tickMs;
+
+  return {
+    tickMs,
+    maxAdvanceMs: positiveNumber(env['PLAYTIME_MAX_ADVANCE_MS']) ?? tickMs * 2,
+    idleExitMs: positiveNumber(env['PLAYTIME_IDLE_EXIT_MS']) ?? DEFAULT_DAEMON_CONFIG.idleExitMs,
+    staleSessionMs:
+      positiveNumber(env['PLAYTIME_STALE_SESSION_MS']) ?? DEFAULT_DAEMON_CONFIG.staleSessionMs,
+  };
+}
+
 export class Daemon {
   readonly #paths: Paths;
   readonly #config: DaemonConfig;
@@ -153,10 +178,31 @@ function summarize(state: SessionState, record: SessionRecord | undefined): Live
   };
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms).unref?.();
+/**
+ * Waits out the gap between ticks.
+ *
+ * The timer is deliberately not unref'd: in a standalone daemon it is the only
+ * thing holding the event loop open, and unref'ing it makes the process exit
+ * after a single tick. It has to be abortable too, otherwise a shutdown signal
+ * would sit unnoticed until the current interval elapsed.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+
+    const done = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    };
+
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener('abort', done, { once: true });
   });
+}
 
 /** Runs until the daemon goes idle or the caller aborts. */
 export async function runDaemon(
@@ -170,7 +216,7 @@ export async function runDaemon(
   while (!signal?.aborted) {
     await daemon.tick();
     if (daemon.shouldExit) break;
-    await sleep(config.tickMs);
+    await sleep(config.tickMs, signal);
   }
 
   await daemon.shutdown();

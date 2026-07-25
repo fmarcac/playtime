@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { Daemon, DEFAULT_DAEMON_CONFIG } from './daemon.js';
+import { configFromEnv, Daemon, DEFAULT_DAEMON_CONFIG, runDaemon } from './daemon.js';
 import type { DaemonConfig } from './daemon.js';
 import type { AliveProbe } from './tracker.js';
 import { resolvePaths } from '../store/paths.js';
@@ -281,5 +281,78 @@ test('a corrupt inbox line does not stop the surrounding events being tracked', 
     await daemon.tick();
 
     assert.equal(daemon.trackedCount, 1);
+  });
+});
+
+test('an empty environment gives the default cadence', () => {
+  assert.deepEqual(configFromEnv({}), DEFAULT_DAEMON_CONFIG);
+});
+
+test('shortening the tick tightens the interpolation clamp with it', () => {
+  const config = configFromEnv({ PLAYTIME_TICK_MS: '1000' });
+
+  assert.equal(config.tickMs, 1000);
+  assert.equal(config.maxAdvanceMs, 2000);
+});
+
+test('an explicit clamp overrides the one derived from the tick', () => {
+  const config = configFromEnv({ PLAYTIME_TICK_MS: '1000', PLAYTIME_MAX_ADVANCE_MS: '9000' });
+
+  assert.equal(config.maxAdvanceMs, 9000);
+});
+
+test('the idle timeout and stale timeout can be set independently', () => {
+  const config = configFromEnv({ PLAYTIME_IDLE_EXIT_MS: '5000', PLAYTIME_STALE_SESSION_MS: '7000' });
+
+  assert.equal(config.idleExitMs, 5000);
+  assert.equal(config.staleSessionMs, 7000);
+});
+
+test('a nonsense value falls back to the default rather than breaking the daemon', () => {
+  assert.equal(configFromEnv({ PLAYTIME_TICK_MS: 'soon' }).tickMs, DEFAULT_DAEMON_CONFIG.tickMs);
+  assert.equal(configFromEnv({ PLAYTIME_TICK_MS: '-5' }).tickMs, DEFAULT_DAEMON_CONFIG.tickMs);
+  assert.equal(configFromEnv({ PLAYTIME_TICK_MS: '0' }).tickMs, DEFAULT_DAEMON_CONFIG.tickMs);
+});
+
+test('the daemon loop keeps ticking until the work is done', async () => {
+  await withTempHome(async (paths) => {
+    // Short real-time cadence: this exercises the loop itself, not just one tick.
+    const config: DaemonConfig = {
+      tickMs: 5,
+      maxAdvanceMs: 1000,
+      idleExitMs: 20,
+      staleSessionMs: 60_000,
+    };
+
+    let probes = 0;
+    const diesOnThirdProbe: AliveProbe = () => ++probes < 3;
+
+    await appendEnvelope(paths, envelope('SessionStart', Date.now()));
+    await runDaemon(paths, config, { now: Date.now, isAlive: diesOnThirdProbe, pid: 1 });
+
+    assert.ok(probes >= 3, `expected the loop to tick repeatedly, it probed ${probes} times`);
+    assert.equal((await readSessions(paths)).items.length, 1);
+  });
+});
+
+test('the daemon loop stops promptly when aborted', async () => {
+  await withTempHome(async (paths) => {
+    const config: DaemonConfig = {
+      tickMs: 60_000,
+      maxAdvanceMs: 1000,
+      idleExitMs: 60_000,
+      staleSessionMs: 60_000,
+    };
+
+    const controller = new AbortController();
+    await appendEnvelope(paths, envelope('SessionStart', Date.now()));
+
+    const running = runDaemon(paths, config, { now: Date.now, isAlive: ALIVE, pid: 1 }, controller.signal);
+    setTimeout(() => controller.abort(), 20);
+
+    // Without an abortable sleep this would hang for the full tick interval.
+    await running;
+
+    assert.equal((await readSessions(paths)).items.length, 1);
   });
 });

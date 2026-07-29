@@ -120,21 +120,21 @@ status bars, `playtime statusline --json` emits the same numbers structured.
 
 ## Settings
 
-`playtime config` in a terminal opens a small settings screen: settings are
-numbered, you type a number to change one, `r 3` to put one back to its default,
-and `q` to save and quit. It scrolls with the rest of your terminal rather than
-taking over the screen, so it works fine over ssh. Piped or scripted, the same
-command prints a plain listing instead, and `playtime config set <key> <value>`
-changes one without the screen.
+`playtime config` in a terminal opens an interactive settings screen. Arrow
+keys move, left and right cycle a setting with fixed choices, enter types a
+value, `r` resets one, `q` saves and quits. It redraws its own block rather than
+taking over the screen, so it scrolls with your scrollback and works over ssh.
 
 ```
-  *  1  count              stacked   how overlapping sessions are totalled
-     2  statusline.format  {open}…   template for the status line
-     3  statusline.window  today     period the status line reports
+  > count              wallclock                 how overlapping sessions are totalled ←→
+    statusline.format  {open} open · {busy} busy  template for the status line
+    statusline.window  today                     period the status line reports
 
-  * marks a value you have changed
-  number to edit, r <number> to reset, q to save and quit
+  ↑↓ move   ←→ change   enter type a value   r reset   q save and quit
 ```
+
+Piped or scripted it prints a plain listing instead, and
+`playtime config set <key> <value>` changes one without the screen.
 
 | Setting | Default | Does |
 |---|---|---|

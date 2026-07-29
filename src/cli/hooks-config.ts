@@ -37,6 +37,13 @@ export function isPlaytimeHook(entry: HookEntry): boolean {
   return entry.command.includes(EMIT_MARKER);
 }
 
+/** Codex refuses anything longer and warns about clamping. The shim needs milliseconds. */
+const TIMEOUT_SECONDS: Record<Harness, number> = {
+  'claude-code': 5,
+  codex: 3,
+  opencode: 5,
+};
+
 export function playtimeHooks(emitPath: string, harness: Harness): HookMap {
   const map: HookMap = {};
 
@@ -44,7 +51,7 @@ export function playtimeHooks(emitPath: string, harness: Harness): HookMap {
     const entry: HookEntry = {
       type: 'command',
       command: `"${emitPath}" ${harness} ${event}`,
-      timeout: 5,
+      timeout: TIMEOUT_SECONDS[harness],
     };
     map[event] = [matcher === undefined ? { hooks: [entry] } : { matcher, hooks: [entry] }];
   }

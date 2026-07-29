@@ -1,9 +1,15 @@
 {
   "name": "playtime",
   "description": "Steam-style playtime tracking for CLI agent harnesses: deduplicated open time, agent busy time, per-project breakdown",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "homepage": "https://github.com/fmarcac/playtime",
   "repository": "https://github.com/fmarcac/playtime",
   "license": "MIT",
-  "keywords": ["playtime", "statusline", "ccstatusline", "tracking", "metrics"]
+  "keywords": [
+    "playtime",
+    "statusline",
+    "ccstatusline",
+    "tracking",
+    "metrics"
+  ]
 }

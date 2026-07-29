@@ -45,7 +45,40 @@ export function renderSettings(loaded: LoadedSettings): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** The interactive menu: one numbered line per setting, current value alongside. */
+/**
+ * The interactive menu as an array of lines, so the caller knows exactly how
+ * many rows to move the cursor back over when it redraws in place.
+ *
+ * `selected` of -1 highlights nothing, which is what the plain listing wants.
+ */
+export function menuLines(settings: Settings, path: string, selected = -1): string[] {
+  const keys = DEFINITIONS.map((entry) => entry.key);
+  const values = DEFINITIONS.map((entry) => valueOf(settings, entry));
+
+  const keyWidth = keys.reduce((max, key) => Math.max(max, key.length), 0);
+  const valueWidth = values.reduce((max, value) => Math.max(max, Math.min(value.length, 28)), 0);
+
+  const rows = DEFINITIONS.map((definition, index) => {
+    const value = (values[index] ?? '').slice(0, 28).padEnd(valueWidth);
+    const changed = values[index] !== String(definition.fallback);
+    const cycles = definition.choices ? ' ←→' : '';
+    const body = `${changed ? '*' : ' '} ${definition.key.padEnd(keyWidth)}  ${value}  ${definition.summary}${cycles}`;
+
+    return index === selected ? `\u001b[7m> ${body}\u001b[0m` : `  ${body}`;
+  });
+
+  return [
+    'PLAYTIME SETTINGS',
+    '',
+    `  ${path}`,
+    '',
+    ...rows,
+    '',
+    '  ↑↓ move   ←→ change   enter type a value   r reset   q save and quit',
+  ];
+}
+
+/** The numbered, non-interactive rendering. */
 export function renderMenu(settings: Settings, path: string): string {
   const keys = DEFINITIONS.map((entry) => entry.key);
   const values = DEFINITIONS.map((entry) => valueOf(settings, entry));

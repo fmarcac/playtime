@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex SessionStart",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
@@ -18,7 +18,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex SessionEnd",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
@@ -29,7 +29,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex UserPromptSubmit",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
@@ -40,7 +40,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex Stop",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
@@ -51,7 +51,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex Notification",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
@@ -63,7 +63,7 @@
           {
             "type": "command",
             "command": "\"${CODEX_PLUGIN_ROOT}/adapters/shared/emit.sh\" codex PostToolUse",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }

@@ -123,3 +123,42 @@ test('the settings menu numbers every setting and marks the changed ones', async
   assert.equal(definitionAt('99'), null);
   assert.equal(definitionAt('nope'), null);
 });
+
+test('the interactive menu highlights the selected row', async () => {
+  const { menuLines } = await import('./settings-view.js');
+  const { defaultSettings } = await import('../core/settings.js');
+
+  const lines = menuLines(defaultSettings(), '/tmp/config.json', 0);
+  const highlighted = lines.filter((line) => line.includes('\u001b[7m'));
+
+  assert.equal(highlighted.length, 1, 'exactly one row is selected');
+  assert.match(highlighted[0] ?? '', /count/);
+});
+
+test('settings changed by arrow keys advertise that they cycle', async () => {
+  const { menuLines } = await import('./settings-view.js');
+  const { defaultSettings } = await import('../core/settings.js');
+
+  const lines = menuLines(defaultSettings(), '/tmp/config.json');
+
+  assert.match(lines.find((l) => l.includes('count')) ?? '', /\u2190\u2192/);
+  assert.doesNotMatch(lines.find((l) => l.includes('projects.limit')) ?? '', /\u2190\u2192/);
+});
+
+test('no row is highlighted when nothing is selected', async () => {
+  const { menuLines } = await import('./settings-view.js');
+  const { defaultSettings } = await import('../core/settings.js');
+
+  const lines = menuLines(defaultSettings(), '/tmp/config.json');
+
+  assert.ok(!lines.some((line) => line.includes('\u001b[7m')));
+});
+
+test('Codex hooks stay inside the timeout it will accept', () => {
+  // Codex warns "clamping SessionEnd hook timeout to 3s" for anything larger.
+  for (const groups of Object.values(playtimeHooks(EMIT, 'codex'))) {
+    for (const group of groups) {
+      for (const hook of group.hooks) assert.ok((hook.timeout ?? 0) <= 3, `${hook.command} too long`);
+    }
+  }
+});

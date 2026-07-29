@@ -191,10 +191,28 @@ export class Daemon {
     return this.#tracker.size;
   }
 
+  /**
+   * The last writes of all, and the ones that save whatever is still open.
+   *
+   * Guarded separately and in that order: history is what the hours live in,
+   * and a snapshot that cannot be written must not stop it being flushed. An
+   * unguarded throw here escapes runDaemon entirely, which is how a transient
+   * ENOSPC used to end a daemon with a stack trace instead of a saved session.
+   */
   async shutdown(): Promise<void> {
     const now = this.#deps.now();
-    await this.#record(this.#tracker.closeAll(now));
-    await this.#writeSnapshot(now);
+
+    try {
+      await this.#record(this.#tracker.closeAll(now));
+    } catch (error) {
+      await this.#report('shutdown', error);
+    }
+
+    try {
+      await this.#writeSnapshot(now);
+    } catch (error) {
+      await this.#report('shutdown snapshot', error);
+    }
   }
 
   async #record(closed: readonly SessionRecord[]): Promise<void> {

@@ -383,6 +383,44 @@ test('a tick that cannot write keeps the daemon alive', async () => {
   });
 });
 
+test('a shutdown that cannot snapshot still flushes the session to history', async () => {
+  await withTempHome(async (paths) => {
+    const clock = fakeClock(T0);
+    const daemon = await Daemon.start(paths, CONFIG, { now: clock.now, isAlive: ALIVE });
+    await appendEnvelope(paths, envelope('SessionStart', T0));
+    await daemon.tick();
+
+    const { mkdir, rm } = await import('node:fs/promises');
+    await rm(paths.live, { force: true });
+    await mkdir(paths.live, { recursive: true });
+
+    clock.advance(TICK);
+    await assert.doesNotReject(daemon.shutdown());
+
+    // The hours are the point. Losing the snapshot cannot cost them.
+    assert.equal((await readSessions(paths)).items.length, 1);
+  });
+});
+
+test('a shutdown that cannot reach history still writes the snapshot', async () => {
+  await withTempHome(async (paths) => {
+    const clock = fakeClock(T0);
+    const daemon = await Daemon.start(paths, CONFIG, { now: clock.now, isAlive: ALIVE });
+    await appendEnvelope(paths, envelope('SessionStart', T0));
+    await daemon.tick();
+
+    const { mkdir, rm } = await import('node:fs/promises');
+    await rm(paths.sessions, { force: true });
+    await mkdir(paths.sessions, { recursive: true });
+
+    clock.advance(TICK);
+    await assert.doesNotReject(daemon.shutdown());
+
+    // The snapshot is the other half of the same insurance.
+    assert.ok(await readLive(paths));
+  });
+});
+
 test('an open session reaches durable history without waiting to close', async () => {
   await withTempHome(async (paths) => {
     const clock = fakeClock(T0);

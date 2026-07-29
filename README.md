@@ -91,6 +91,7 @@ playtime statusline          one compact line for status bars
 playtime config              show and change settings
 playtime install             wire up every harness found
 playtime doctor              check hooks, daemon and stored history
+playtime repair              compact history, dropping unreadable lines
 playtime daemon              start the tracker if it is not running
 ```
 
@@ -101,10 +102,78 @@ year are calendar periods, so they reset on the boundary rather than trailing a
 rolling 30 days. `week` is still available by name and stays a rolling seven
 days; ask for it and it joins the strip.
 
-Piped, redirected or with `--json`, a report prints one static block with no
-tabs, so scripts and hooks see exactly what they did before. Add `--json` to any
-report. `--stacked` and `--wallclock` override the counting mode for a single
-run.
+Piped, redirected or in any format but text, a report prints one static block
+with no tabs, so scripts and hooks always see plain output.
+
+## Scripting
+
+Every report takes the same options, so `playtime`, `playtime <project>` and
+`playtime harness <name>` can all be read by a script.
+
+```sh
+playtime --field total.open --units h        # 51.08
+playtime --csv --rows days --since 30d       # a daily series
+playtime --tsv --rows harnesses --units m    # minutes per harness
+playtime --template '{project} {open}' --limit 5
+playtime --jsonl --rows projects | jq -r 'select(.open > 3600000) | .project'
+```
+
+**Pick one output format.**
+
+| Flag | Prints |
+|---|---|
+| *(none)* | the human report |
+| `--json` | the whole rollup as JSON, or an array of rows with `--rows` |
+| `--jsonl` | one JSON object per row |
+| `--csv`, `--tsv` | delimited rows with a header |
+| `--template <line>` | one line per row, from `{tokens}` |
+| `--field <path>` | one value, for example `total.open` or `projects.0.project` |
+| `--format <name>` | the same by name: `text`, `json`, `jsonl`, `csv`, `tsv`, `template`, `field` |
+
+**Shape the rows.**
+
+| Flag | Does |
+|---|---|
+| `--rows <shape>` | `totals`, `harnesses`, `projects` (default) or `days` |
+| `--units <unit>` | `human`, `ms` (default), `s`, `m` or `h` |
+| `--sort <key>` | `open`, `busy`, `blocked`, `sessionTime`, `sessions`, `turns`, `last`, `name`, `date` |
+| `--reverse` | flip the order |
+| `--limit <n>` | keep the first n rows |
+| `--no-header` | leave the CSV or TSV header row out |
+
+**Choose what to report on.**
+
+| Flag | Does |
+|---|---|
+| `--since <when>`, `--until <when>` | an explicit window, overriding the named one |
+| `--project <filter>`, `--harness <name>` | select by flag rather than by position |
+| `--stacked`, `--wallclock` | override the counting mode for one run |
+| `--width <n>`, `--no-color` | layout of the text report, as does `NO_COLOR=1` |
+
+`--since` and `--until` take `2026-07-01`, a full ISO timestamp, a span like
+`7d`, `90m` or `2w`, the words `now`, `today` and `yesterday`, or an epoch in
+seconds or milliseconds. A bare date means local midnight.
+
+**Columns.** Every row carries both totals, so machine output never depends on
+the counting mode:
+
+| Column | Is |
+|---|---|
+| `open` `busy` `blocked` | deduplicated: an hour with three sessions open is one hour |
+| `sessionTime` | the same open time summed per session instead |
+| `busyStacked` `blockedStacked` | the same, for busy and blocked |
+| `concurrency` | `sessionTime` divided by `open` |
+| `share` | busy as a percentage of open |
+| `sessions` `turns` | counts |
+| `lastPlayed` `start` `end` | ISO 8601 timestamps, always UTC |
+| `project` `harness` `date` | what the row is |
+
+`--rows days` gives one row per local calendar day, including days with nothing
+in them, and the days always add up to the window total. Project paths are
+absolute in machine output rather than shortened to `~`.
+
+Exit codes: **0** done, **1** nothing matched (an unknown project, or a
+`--field` path that is not there), **2** the command line was wrong.
 
 ## ccstatusline
 
@@ -210,6 +279,11 @@ Things it deliberately gets right:
 - **A failed write does not kill the tracker.** Losing a disk write once should
   not cost you the hours the daemon was holding, so failures are logged and the
   loop carries on.
+- **A truncated line costs a line, not a history.** Reading skips what it
+  cannot parse. `playtime repair` drops those lines and collapses the
+  superseded checkpoints, keeping a `.playtime-backup` of the file as it was;
+  the daemon does the same for itself when it starts, which is the one moment
+  nothing else is appending.
 - **A recycled pid does not resurrect a dead session.** Process start times are
   recorded next to pids.
 - **Failures undercount, never overcount.** If anything breaks, time stops
@@ -238,7 +312,7 @@ Everything is local. Nothing is sent anywhere.
 
 ```
 ${XDG_DATA_HOME:-~/.local/share}/playtime/
-  sessions.jsonl    append-only history, one line per session
+  sessions.jsonl    append-only history, one line per session per checkpoint
   live.json         open sessions, cached totals, daemon checkpoint
   inbox/            hook drop box, drained every tick
   daemon.lock       single-instance lock

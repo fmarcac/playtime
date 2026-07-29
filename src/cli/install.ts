@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { Harness } from '../core/events.js';
 import { isMissingFile } from '../store/jsonl.js';
-import { mergeHooks, playtimeHooks } from './hooks-config.js';
+import { EMIT_MARKER, mergeHooks, playtimeHooks } from './hooks-config.js';
 import type { HookMap } from './hooks-config.js';
 
 export interface InstallResult {
@@ -34,6 +34,30 @@ export function emitScriptPath(): string {
 
 export function daemonEntryPath(): string {
   return join(packageRoot(), 'dist', 'daemon', 'main.js');
+}
+
+/** The module OpenCode's plugin file re-exports, which is this copy of Playtime. */
+export function openCodePluginSource(): string {
+  return join(packageRoot(), 'dist', 'adapters', 'opencode', 'plugin.js');
+}
+
+/**
+ * How to recognise our wiring in a harness config.
+ *
+ * `marker` says the harness is wired to some copy of Playtime; `expected` says
+ * it is wired to this one. OpenCode loads a plugin module rather than running a
+ * shell hook, so it has nothing in common with the other two.
+ */
+export interface Wiring {
+  marker: string;
+  expected: string;
+}
+
+export function wiringFor(harness: Harness): Wiring {
+  if (harness === 'opencode') {
+    return { marker: 'PlaytimePlugin', expected: openCodePluginSource() };
+  }
+  return { marker: EMIT_MARKER, expected: emitScriptPath() };
 }
 
 async function readJsonObject(file: string): Promise<Record<string, unknown> | null> {
@@ -94,8 +118,7 @@ async function installHookFile(
  * forward without a reinstall.
  */
 async function installOpenCode(target: string): Promise<InstallResult> {
-  const source = join(packageRoot(), 'dist', 'adapters', 'opencode', 'plugin.js');
-  const contents = `export { PlaytimePlugin } from ${JSON.stringify(source)};\n`;
+  const contents = `export { PlaytimePlugin } from ${JSON.stringify(openCodePluginSource())};\n`;
 
   const existing = await readFile(target, 'utf8').catch(() => null);
   if (existing === contents) return { harness: 'opencode', target, status: 'unchanged' };

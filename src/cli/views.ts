@@ -21,6 +21,8 @@ export interface ViewContext {
   home: string;
   width: number;
   window: WindowKind;
+  /** Overrides the window's name, for a report clipped to explicit dates. */
+  label?: string | undefined;
   count: CountMode;
   projectLimit?: number | undefined;
   color?: boolean | undefined;
@@ -63,7 +65,7 @@ function header(title: string, right: string, ctx: ViewContext): string {
 function windowLabel(ctx: ViewContext): string {
   if (ctx.tabs) return ctx.count === 'stacked' ? 'stacked' : '';
 
-  const window = WINDOW_LABELS[ctx.window];
+  const window = ctx.label ?? WINDOW_LABELS[ctx.window];
   return ctx.count === 'stacked' ? `${window} · stacked` : window;
 }
 

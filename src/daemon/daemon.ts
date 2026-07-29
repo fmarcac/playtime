@@ -17,6 +17,7 @@ import { drainInbox } from '../store/inbox.js';
 import { readLive, writeLive } from '../store/live.js';
 import type { LiveSessionSummary, LiveSnapshot } from '../store/live.js';
 import type { Paths } from '../store/paths.js';
+import { repairSessions } from '../store/repair.js';
 import { appendSessions, readSessions } from '../store/sessions.js';
 import { Tracker } from './tracker.js';
 import type { AliveProbe } from './tracker.js';
@@ -104,6 +105,11 @@ export class Daemon {
   }
 
   static async start(paths: Paths, config: DaemonConfig, deps: DaemonDeps): Promise<Daemon> {
+    // The daemon holds the lock and is the only writer, so startup is the one
+    // moment history can be compacted with nothing else appending to it.
+    // Failing to tidy is never a reason not to track.
+    await repairSessions(paths).catch(() => undefined);
+
     const history = (await readSessions(paths)).items;
 
     const tracker = new Tracker({

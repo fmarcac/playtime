@@ -4,14 +4,15 @@ import { access, readFile, stat } from 'node:fs/promises';
 import { constants } from 'node:fs';
 
 import { HARNESSES, HARNESS_LABELS } from '../core/events.js';
+import type { Harness } from '../core/events.js';
 import { formatDuration, formatRelative } from '../core/format.js';
 import { processIsAlive } from '../daemon/proc.js';
 import { readLive } from '../store/live.js';
 import { readLock } from '../store/lock.js';
 import type { Paths } from '../store/paths.js';
-import { readSessions } from '../store/sessions.js';
-import { EMIT_MARKER } from './hooks-config.js';
-import { installTarget } from './install.js';
+import { inspectSessions } from '../store/repair.js';
+import type { RepairReport } from '../store/repair.js';
+import { installTarget, wiringFor } from './install.js';
 
 export interface Check {
   name: string;
@@ -67,48 +68,90 @@ async function checkDaemon(paths: Paths, now: number): Promise<Check> {
   return { name: 'daemon', status: 'ok', detail: `pid ${lock.pid}, last tick ${formatDuration(age)} ago` };
 }
 
-async function checkHooks(): Promise<Check[]> {
-  return Promise.all(
-    HARNESSES.map(async (harness) => {
-      const target = installTarget(harness);
-      const name = `${HARNESS_LABELS[harness]} hooks`;
+/**
+ * The path a harness is actually pointed at. Config that names some other copy
+ * of Playtime is the failure mode behind a tracker that quietly stops: the
+ * package moved, and the hook kept calling where it used to be.
+ */
+export function referencedPath(contents: string, harness: Harness): string | null {
+  const pattern = harness === 'opencode' ? /from\s+"([^"]+)"/ : /"([^"]*emit\.sh)"/;
+  return pattern.exec(contents)?.[1] ?? null;
+}
 
-      const contents = await readFile(target, 'utf8').catch(() => null);
-      if (contents === null) {
-        return { name, status: 'warn' as const, detail: `no config at ${target}` };
-      }
-      if (!contents.includes(EMIT_MARKER)) {
-        return {
-          name,
-          status: 'warn' as const,
-          detail: `not wired up, run \`playtime install --harness ${harness}\``,
-        };
-      }
+async function checkHarness(harness: Harness): Promise<Check> {
+  const target = installTarget(harness);
+  const kind = harness === 'opencode' ? 'plugin' : 'hooks';
+  const name = `${HARNESS_LABELS[harness]} ${kind}`;
+  const { marker, expected } = wiringFor(harness);
+  const retry = `run \`playtime install --harness ${harness}\``;
 
-      return { name, status: 'ok' as const, detail: target };
-    }),
+  const contents = await readFile(target, 'utf8').catch(() => null);
+  if (contents === null) {
+    return { name, status: 'warn', detail: `no ${kind} at ${target}, ${retry}` };
+  }
+
+  if (!contents.includes(marker)) {
+    return { name, status: 'warn', detail: `not wired up, ${retry}` };
+  }
+
+  const referenced = referencedPath(contents, harness);
+  if (referenced !== null && referenced !== expected) {
+    return {
+      name,
+      status: 'warn',
+      detail: `wired to another copy of Playtime at ${referenced}, ${retry} to point it here`,
+    };
+  }
+
+  // A shell hook has to be executable; a module only has to be readable.
+  const needed = harness === 'opencode' ? constants.R_OK : constants.X_OK;
+  const usable = await access(referenced ?? expected, needed).then(
+    () => true,
+    () => false,
   );
+
+  if (!usable) {
+    return {
+      name,
+      status: 'fail',
+      detail: `points at ${referenced ?? expected}, which is missing or cannot be run, ${retry}`,
+    };
+  }
+
+  return { name, status: 'ok', detail: target };
 }
 
 async function checkHistory(paths: Paths, now: number): Promise<Check> {
-  const stored = await readSessions(paths);
+  const found = await inspectSessions(paths);
+  const sessions = found.records.length;
 
-  if (stored.corrupt > 0) {
+  if (found.unreadable > 0) {
     return {
       name: 'history',
       status: 'warn',
-      detail: `${stored.items.length} sessions, ${stored.corrupt} unreadable lines skipped`,
+      detail: `${sessions} sessions, ${found.unreadable} unreadable lines, run \`playtime repair\``,
     };
   }
-  if (stored.items.length === 0) {
+
+  if (sessions === 0) {
     return { name: 'history', status: 'warn', detail: 'no sessions recorded yet' };
   }
 
-  const latest = Math.max(...stored.items.map((record) => record.end));
+  // Checkpoints are one line per open session per minute, so a file several
+  // times longer than its session count is just waiting to be compacted.
+  if (found.superseded > sessions) {
+    return {
+      name: 'history',
+      status: 'warn',
+      detail: `${sessions} sessions across ${found.lines} lines, run \`playtime repair\` to compact`,
+    };
+  }
+
+  const latest = Math.max(...found.records.map((record) => record.end));
   return {
     name: 'history',
     status: 'ok',
-    detail: `${stored.items.length} sessions, most recent ${formatRelative(latest, now)}`,
+    detail: `${sessions} sessions, most recent ${formatRelative(latest, now)}`,
   };
 }
 
@@ -134,7 +177,7 @@ export async function runDoctor(paths: Paths, now: number): Promise<Check[]> {
   return [
     await checkDataDirectory(paths),
     await checkDaemon(paths, now),
-    ...(await checkHooks()),
+    ...(await Promise.all(HARNESSES.map(checkHarness))),
     await checkHistory(paths, now),
     await checkInbox(paths),
   ];
@@ -150,4 +193,29 @@ export function renderDoctor(checks: readonly Check[]): string {
   );
 
   return `PLAYTIME DOCTOR\n\n${lines.join('\n')}\n`;
+}
+
+export function renderRepair(report: RepairReport, dryRun: boolean): string {
+  const lines = ['PLAYTIME REPAIR', ''];
+  const nothingWrong = report.unreadable === 0 && report.superseded === 0;
+
+  lines.push(`  ${report.lines} lines read`);
+  lines.push(`  ${report.kept} sessions kept`);
+
+  if (report.unreadable > 0) {
+    lines.push(`  ${report.unreadable} unreadable lines ${dryRun ? 'to drop' : 'dropped'}`);
+  }
+  if (report.superseded > 0) {
+    lines.push(
+      `  ${report.superseded} superseded checkpoints ${dryRun ? 'to collapse' : 'collapsed'}`,
+    );
+  }
+
+  lines.push('');
+
+  if (nothingWrong) lines.push('  History is already clean, nothing to do.');
+  else if (dryRun) lines.push('  Run `playtime repair` to write this.');
+  else if (report.backup) lines.push(`  The file as it was is at ${report.backup}`);
+
+  return `${lines.join('\n')}\n`;
 }

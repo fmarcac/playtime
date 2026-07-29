@@ -23,6 +23,27 @@ export function tabsFor(current: WindowKind): WindowKind[] {
   );
 }
 
+/** An explicit window, from `--since` and `--until`. Either end may be open. */
+export interface Range {
+  since?: number | undefined;
+  until?: number | undefined;
+}
+
+/**
+ * The window a report should clip to. An explicit range wins over the named
+ * window, since asking for both can only mean the exact dates were meant.
+ */
+export function resolveWindow(
+  kind: WindowKind,
+  range: Range | undefined,
+  now: number,
+): Interval | null {
+  if (range && (range.since !== undefined || range.until !== undefined)) {
+    return [range.since ?? 0, range.until ?? now];
+  }
+  return windowFor(kind, now);
+}
+
 /** Local midnight at the start of the day containing `ts`. */
 export function startOfDay(ts: number): number {
   const date = new Date(ts);

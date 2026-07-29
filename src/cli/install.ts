@@ -65,8 +65,9 @@ function openCodePluginPath(env: NodeJS.ProcessEnv): string {
 }
 
 /**
- * Claude Code keeps hooks under a top-level `hooks` key in settings.json, while
- * Codex puts the events at the root of its own hooks.json.
+ * Both Claude Code and Codex keep their events under a top-level `hooks` key.
+ * Codex rejects events at the root outright: "unknown field `SessionStart`,
+ * expected `description` or `hooks`".
  */
 async function installHookFile(
   harness: Harness,
@@ -129,7 +130,7 @@ export async function install(
       case 'claude-code':
         return await installHookFile(harness, target, true);
       case 'codex':
-        return await installHookFile(harness, target, false);
+        return await installHookFile(harness, target, true);
       case 'opencode':
         return await installOpenCode(target);
     }

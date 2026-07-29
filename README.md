@@ -47,6 +47,10 @@ You can also install it from inside a harness:
 
 Pick one route per harness. Doing both records every event twice.
 
+The status line integration is Claude Code only, through ccstatusline. Codex's
+status line takes a fixed set of built-in widgets and has no custom command
+slot, so there is nowhere to put it. Run `playtime` in a terminal instead.
+
 ## What it measures
 
 **Open time** is wall-clock time a harness was running. It is a union, never a
@@ -116,7 +120,21 @@ status bars, `playtime statusline --json` emits the same numbers structured.
 
 ## Settings
 
-`playtime config` lists every setting with what it does and what it accepts.
+`playtime config` in a terminal opens a small settings screen: settings are
+numbered, you type a number to change one, `r 3` to put one back to its default,
+and `q` to save and quit. It scrolls with the rest of your terminal rather than
+taking over the screen, so it works fine over ssh. Piped or scripted, the same
+command prints a plain listing instead, and `playtime config set <key> <value>`
+changes one without the screen.
+
+```
+  *  1  count              stacked   how overlapping sessions are totalled
+     2  statusline.format  {open}…   template for the status line
+     3  statusline.window  today     period the status line reports
+
+  * marks a value you have changed
+  number to edit, r <number> to reset, q to save and quit
+```
 
 | Setting | Default | Does |
 |---|---|---|

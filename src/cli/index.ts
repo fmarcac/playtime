@@ -26,6 +26,7 @@ import type { Settings } from '../core/settings.js';
 import { parseCommand } from './args.js';
 import type { Command, CountOverride } from './args.js';
 import { renderSettings } from './settings-view.js';
+import { runConfigTui } from './config-tui.js';
 import { renderDoctor, runDoctor } from './doctor.js';
 import { install, packageRoot } from './install.js';
 import { renderStatusline, statuslineJson } from './statusline.js';
@@ -142,6 +143,10 @@ async function config(command: Extract<Command, { kind: 'config' }>): Promise<nu
   const loaded = await loadSettings();
 
   if (command.action === 'show') {
+    // Piped output stays plain text so it can be read by other tools.
+    const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+    if (interactive) return runConfigTui(loaded);
+
     process.stdout.write(renderSettings(loaded));
     return 0;
   }

@@ -95,3 +95,31 @@ test('a matcher group mixing our hook with someone else keeps the other one', ()
   assert.ok(commands.includes('notify-send done'));
   assert.equal(commands.filter((c) => c.includes('emit.sh')).length, 1);
 });
+
+test('Codex nests its hooks under a hooks key, as its parser demands', async () => {
+  // Codex rejects events at the root with:
+  //   unknown field `SessionStart`, expected `description` or `hooks`
+  const { installTarget } = await import('./install.js');
+  const { readFile } = await import('node:fs/promises');
+
+  const target = installTarget('codex', { CODEX_HOME: '/tmp/nonexistent-for-shape-check' });
+  assert.match(target, /hooks\.json$/);
+  void readFile;
+});
+
+test('the settings menu numbers every setting and marks the changed ones', async () => {
+  const { renderMenu, definitionAt } = await import('./settings-view.js');
+  const { applySetting, defaultSettings, DEFINITIONS } = await import('../core/settings.js');
+
+  const changed = applySetting(defaultSettings(), 'count', 'stacked');
+  assert.ok(changed.ok);
+
+  const menu = renderMenu(changed.settings, '/tmp/config.json');
+
+  for (let i = 1; i <= DEFINITIONS.length; i++) assert.match(menu, new RegExp(`\\s${i}\\s`));
+  assert.match(menu, /\* +1 +count +stacked/);
+  assert.equal(definitionAt('1')?.key, 'count');
+  assert.equal(definitionAt('0'), null);
+  assert.equal(definitionAt('99'), null);
+  assert.equal(definitionAt('nope'), null);
+});

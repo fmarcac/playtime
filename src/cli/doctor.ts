@@ -74,7 +74,10 @@ async function checkDaemon(paths: Paths, now: number): Promise<Check> {
  * package moved, and the hook kept calling where it used to be.
  */
 export function referencedPath(contents: string, harness: Harness): string | null {
-  const pattern = harness === 'opencode' ? /from\s+"([^"]+)"/ : /"([^"]*emit\.sh)"/;
+  // A hook command is a string inside a JSON string, so the quotes around the
+  // path are backslash-escaped and matching on them finds nothing. Match the
+  // path itself: everything up to emit.sh that cannot be part of the quoting.
+  const pattern = harness === 'opencode' ? /from\s+"([^"]+)"/ : /([^"\\\s]*emit\.sh)/;
   return pattern.exec(contents)?.[1] ?? null;
 }
 

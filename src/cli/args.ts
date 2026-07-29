@@ -5,7 +5,7 @@ import { parseWhen } from '../core/when.js';
 import { isWindowKind } from '../core/window.js';
 import type { Range, WindowKind } from '../core/window.js';
 import { defaultOutput, OUTPUT_FORMATS, ROW_SHAPES, SORT_KEYS, UNITS } from './output.js';
-import type { OutputFormat, OutputOptions, RowShape, SortKey, Units } from './output.js';
+import type { OutputFormat, OutputOptions } from './output.js';
 
 /** Undefined means the setting decides; a flag overrides it for one run. */
 export type CountOverride = CountMode | undefined;
@@ -185,21 +185,21 @@ function readOutput(parsed: Parsed): OutputOptions | { error: string } {
   if (rows !== undefined) {
     const shape = oneOf(rows, ROW_SHAPES, '--rows');
     if (isError(shape)) return shape;
-    output.shape = shape as RowShape;
+    output.shape = shape;
   }
 
   const units = parsed.values.get('--units');
   if (units !== undefined) {
     const unit = oneOf(units, UNITS, '--units');
     if (isError(unit)) return unit;
-    output.units = unit as Units;
+    output.units = unit;
   }
 
   const sort = parsed.values.get('--sort');
   if (sort !== undefined) {
     const key = oneOf(sort, SORT_KEYS, '--sort');
     if (isError(key)) return key;
-    output.sort = key as SortKey;
+    output.sort = key;
   }
 
   const limit = parsed.values.get('--limit');

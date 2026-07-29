@@ -11,7 +11,7 @@
 import type { Harness } from '../core/events.js';
 import { formatDuration } from '../core/format.js';
 import { concurrency } from '../core/rollup.js';
-import type { HarnessRollup, ProjectRollup, Rollup, Totals } from '../core/rollup.js';
+import type { Rollup, Totals } from '../core/rollup.js';
 import type { DayTotals } from '../core/daily.js';
 
 export const OUTPUT_FORMATS = ['text', 'json', 'jsonl', 'csv', 'tsv', 'template', 'field'] as const;
@@ -122,9 +122,9 @@ function sources(data: Rollup, days: readonly DayTotals[], shape: RowShape): Sou
     case 'totals':
       return [{ ...data.total, lastPlayed: data.lastPlayed }];
     case 'harnesses':
-      return [...(data.harnesses as readonly HarnessRollup[])];
+      return [...data.harnesses];
     case 'projects':
-      return [...(data.projects as readonly ProjectRollup[])];
+      return [...data.projects];
     case 'days':
       return [...days];
   }

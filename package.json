@@ -1,6 +1,6 @@
 {
   "name": "agent-playtime",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Steam-style playtime tracking for CLI agent harnesses: Claude Code, Codex and OpenCode",
   "keywords": [
     "claude-code",

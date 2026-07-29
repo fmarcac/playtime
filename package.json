@@ -1,5 +1,5 @@
 {
-  "name": "harness-playtime",
+  "name": "agent-playtime",
   "version": "0.2.0",
   "description": "Steam-style playtime tracking for CLI agent harnesses: Claude Code, Codex and OpenCode",
   "keywords": [
@@ -13,13 +13,13 @@
   ],
   "license": "MIT",
   "author": "Filip Marcac",
-  "homepage": "https://github.com/fmarcac/playtime#readme",
+  "homepage": "https://github.com/fmarcac/agent-playtime#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fmarcac/playtime.git"
+    "url": "git+https://github.com/fmarcac/agent-playtime.git"
   },
   "bugs": {
-    "url": "https://github.com/fmarcac/playtime/issues"
+    "url": "https://github.com/fmarcac/agent-playtime/issues"
   },
   "type": "module",
   "engines": {

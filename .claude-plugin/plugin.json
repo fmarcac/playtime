@@ -2,8 +2,8 @@
   "name": "playtime",
   "description": "Steam-style playtime tracking for CLI agent harnesses: deduplicated open time, agent busy time, per-project breakdown",
   "version": "0.2.0",
-  "homepage": "https://github.com/fmarcac/playtime",
-  "repository": "https://github.com/fmarcac/playtime",
+  "homepage": "https://github.com/fmarcac/agent-playtime",
+  "repository": "https://github.com/fmarcac/agent-playtime",
   "license": "MIT",
   "keywords": [
     "playtime",

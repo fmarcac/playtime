@@ -28,9 +28,16 @@ PLAYTIME                                                        all time
 ## Install
 
 ```sh
-npm install -g harness-playtime
+npm install -g agent-playtime
 playtime install
 playtime doctor
+```
+
+Or without installing anything:
+
+```sh
+npx agent-playtime install
+npx agent-playtime
 ```
 
 `playtime install` wires up every harness it finds, backing up each settings
@@ -41,9 +48,9 @@ You can also install it from inside a harness:
 
 | Harness | From within the harness | Manual |
 |---|---|---|
-| Claude Code | `/plugin marketplace add fmarcac/playtime` then `/plugin install playtime` | `playtime install --harness claude-code` |
-| Codex | `/plugin marketplace add fmarcac/playtime` then `/plugin install playtime@playtime` | `playtime install --harness codex` |
-| OpenCode | add `"plugin": ["harness-playtime"]` to `opencode.json` | `playtime install --harness opencode` |
+| Claude Code | `/plugin marketplace add fmarcac/agent-playtime` then `/plugin install playtime` | `playtime install --harness claude-code` |
+| Codex | `/plugin marketplace add fmarcac/agent-playtime` then `/plugin install playtime@playtime` | `playtime install --harness codex` |
+| OpenCode | add `"plugin": ["agent-playtime"]` to `opencode.json` | `playtime install --harness opencode` |
 
 Pick one route per harness. Doing both records every event twice.
 
@@ -145,6 +152,9 @@ Piped or scripted it prints a plain listing instead, and
 | `daemon.tickMs` | `15000` | how often liveness is sampled |
 | `daemon.idleExitMs` | `120000` | how long the daemon lingers when idle |
 
+Cadence can also be overridden per run with `PLAYTIME_TICK_MS`,
+`PLAYTIME_IDLE_EXIT_MS` and `PLAYTIME_CHECKPOINT_MS`.
+
 Stored at `~/.config/playtime/config.json`, holding only what differs from the
 defaults.
 
@@ -178,9 +188,13 @@ Things it deliberately gets right:
 
 - **A sleeping laptop counts for nothing.** Liveness is interpolated only across
   short gaps. Close the lid for eight hours and that time is excluded.
-- **A killed daemon does not lose in-flight sessions.** `live.json` is a
-  checkpoint. The successor resumes from the last confirmed-alive moment, so the
-  outage is never credited.
+- **A killed daemon does not lose in-flight sessions.** Open sessions are
+  written to durable history every minute, not just when they close, and
+  `live.json` is a full checkpoint besides. A successor resumes from the last
+  confirmed-alive moment, so the outage itself is never credited.
+- **A failed write does not kill the tracker.** Losing a disk write once should
+  not cost you the hours the daemon was holding, so failures are logged and the
+  loop carries on.
 - **A recycled pid does not resurrect a dead session.** Process start times are
   recorded next to pids.
 - **Failures undercount, never overcount.** If anything breaks, time stops

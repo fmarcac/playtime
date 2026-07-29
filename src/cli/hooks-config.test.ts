@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { isPlaytimeHook, mergeHooks, playtimeHooks } from './hooks-config.js';
 import type { HookMap } from './hooks-config.js';
 
-const EMIT = '/opt/harness-playtime/adapters/shared/emit.sh';
+const EMIT = '/opt/agent-playtime/adapters/shared/emit.sh';
 
 test('every lifecycle event Playtime needs gets a hook', () => {
   const hooks = playtimeHooks(EMIT, 'claude-code');

@@ -10,7 +10,8 @@ import { displayProject } from '../core/format.js';
 import { rollup } from '../core/rollup.js';
 import { finalize } from '../core/session.js';
 import type { SessionRecord } from '../core/session.js';
-import { windowFor } from '../core/window.js';
+import { tabsFor, windowFor } from '../core/window.js';
+import type { WindowKind } from '../core/window.js';
 import { configFromEnv, runDaemon } from '../daemon/daemon.js';
 import { aliveProbe, processStartTime } from '../daemon/proc.js';
 import { ensureDaemon } from '../daemon/spawn.js';
@@ -25,6 +26,7 @@ import { applySetting, resetSetting } from '../core/settings.js';
 import type { Settings } from '../core/settings.js';
 import { parseCommand } from './args.js';
 import type { Command, CountOverride } from './args.js';
+import { runBrowse } from './browse.js';
 import { renderSettings } from './settings-view.js';
 import { runConfigTui } from './config-tui.js';
 import { renderDoctor, runDoctor } from './doctor.js';
@@ -36,10 +38,13 @@ import type { ViewContext } from './views.js';
 
 const HELP = `playtime - Steam-style playtime tracking for CLI agent harnesses
 
-  playtime                     everything, all time
-  playtime today|week|month    narrow to a window
+  playtime                     everything, with tabs for year, month and today
+  playtime today|month|year    open on one window (week works too)
   playtime <project>           drill into one project
   playtime harness <name>      drill into claude-code, codex or opencode
+
+  In a terminal a report is browsable: tab and shift-tab move between windows,
+  q quits. Piped or with --json it prints one static block instead.
 
   playtime statusline          one compact line, for ccstatusline
   playtime config              show and change settings
@@ -80,10 +85,13 @@ async function load(paths: Paths): Promise<Loaded> {
   return { records: [...stored.items, ...provisional], live };
 }
 
+type Report = Extract<Command, { window: unknown }>;
+
 function context(
-  command: Extract<Command, { window: unknown }>,
+  command: Report,
   settings: Settings,
   now: number,
+  tabs?: readonly WindowKind[],
 ): ViewContext {
   return {
     now,
@@ -93,7 +101,33 @@ function context(
     count: command.count ?? settings.count,
     projectLimit: settings['projects.limit'],
     color: Boolean(process.stdout.isTTY) && process.env['NO_COLOR'] === undefined,
+    tabs,
   };
+}
+
+/**
+ * A report is browsable by tab at a terminal and plain text everywhere else, so
+ * piping it or reading it over a hook still yields one static block.
+ */
+async function report(
+  command: Report,
+  settings: Settings,
+  render: (ctx: ViewContext) => string,
+): Promise<number> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    process.stdout.write(render(context(command, settings, Date.now())));
+    return 0;
+  }
+
+  const windows = tabsFor(command.window);
+
+  // Each tab is rendered when it is opened, so the clock and the window it
+  // implies are both current rather than fixed when the command started.
+  return runBrowse({
+    windows,
+    window: command.window,
+    draw: (window) => render(context({ ...command, window }, settings, Date.now(), windows)),
+  });
 }
 
 /** ccstatusline passes context on stdin; a terminal has none to give. */
@@ -238,31 +272,35 @@ async function main(): Promise<number> {
 
     case 'library': {
       const { records, live } = await load(paths);
-      const data = rollup(records, windowFor(command.window, now));
 
       if (command.json) {
+        const data = rollup(records, windowFor(command.window, now));
         process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
         return 0;
       }
 
-      process.stdout.write(renderLibrary(data, live, context(command, settings, now)));
-      return 0;
+      return report(command, settings, (ctx) =>
+        renderLibrary(rollup(records, windowFor(ctx.window, ctx.now)), live, ctx),
+      );
     }
 
     case 'harness': {
       const { records } = await load(paths);
       const mine = records.filter((record) => record.harness === command.harness);
-      const data = rollup(mine, windowFor(command.window, now));
 
       if (command.json) {
+        const data = rollup(mine, windowFor(command.window, now));
         process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
         return 0;
       }
 
-      process.stdout.write(
-        renderDetail(HARNESS_LABELS[command.harness], data, context(command, settings, now)),
+      return report(command, settings, (ctx) =>
+        renderDetail(
+          HARNESS_LABELS[command.harness],
+          rollup(mine, windowFor(ctx.window, ctx.now)),
+          ctx,
+        ),
       );
-      return 0;
     }
 
     case 'detail': {
@@ -283,17 +321,17 @@ async function main(): Promise<number> {
       }
 
       const mine = records.filter((record) => record.project === selection.project);
-      const data = rollup(mine, windowFor(command.window, now));
 
       if (command.json) {
+        const data = rollup(mine, windowFor(command.window, now));
         process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
         return 0;
       }
 
-      process.stdout.write(
-        renderDetail(displayProject(selection.project, homedir()), data, context(command, settings, now)),
+      const title = displayProject(selection.project, homedir());
+      return report(command, settings, (ctx) =>
+        renderDetail(title, rollup(mine, windowFor(ctx.window, ctx.now)), ctx),
       );
-      return 0;
     }
   }
 }

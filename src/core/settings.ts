@@ -28,7 +28,7 @@ export type SettingKey = keyof Settings;
 const DEFAULTS: Settings = {
   count: 'wallclock',
   'statusline.format': DEFAULT_STATUSLINE_FORMAT,
-  'statusline.window': 'today',
+  'statusline.window': 'allTime',
   'projects.limit': 12,
   'daemon.tickMs': 15_000,
   'daemon.idleExitMs': 120_000,
@@ -60,9 +60,9 @@ export const DEFINITIONS: readonly Definition[] = [
     key: 'count',
     fallback: DEFAULTS.count,
     choices: COUNT_MODES,
-    summary: 'how overlapping sessions are totalled',
+    summary: 'deduplicate sessions open at the same time',
     detail:
-      'wallclock counts an hour with three sessions open as one hour. stacked counts it as three, adding every session up regardless of overlap.',
+      'wallclock deduplicates: an hour with three sessions open counts as one hour. stacked does not: the same hour counts as three, adding every session up regardless of overlap.',
   },
   {
     key: 'statusline.format',
@@ -75,7 +75,8 @@ export const DEFINITIONS: readonly Definition[] = [
     fallback: DEFAULTS['statusline.window'],
     choices: STATUSLINE_WINDOWS,
     summary: 'period the status line reports',
-    detail: 'which window the bare tokens in the format refer to',
+    detail:
+      'which window the bare tokens in the format refer to. allTime is every hour ever recorded.',
   },
   {
     key: 'projects.limit',

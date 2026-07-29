@@ -63,7 +63,7 @@ export function renderStatusline(
   // A status line should show nothing rather than an error when there is no data yet.
   if (!snapshot) return '';
 
-  const window = options.window ?? 'today';
+  const window = options.window ?? 'allTime';
   const count = options.count ?? 'wallclock';
   const rendered = fill(options.format ?? DEFAULT_STATUSLINE_FORMAT, snapshot, window, count);
 

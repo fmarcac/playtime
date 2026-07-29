@@ -260,6 +260,61 @@ test('a session whose agent is working right now says so', () => {
   assert.match(renderLibrary(rollup([session({ hours: 1 })]), live, CTX), /working/i);
 });
 
+test('the tab strip names every window and marks the one being shown', () => {
+  const output = renderLibrary(rollup([session({ hours: 4 })]), null, {
+    ...CTX,
+    window: 'month',
+    tabs: ['all', 'year', 'month', 'today'],
+  });
+
+  const strip = output.split('\n').find((line) => line.includes('all time')) ?? '';
+
+  assert.match(strip, /\[this month\]/);
+  assert.match(strip, / all time /);
+  assert.match(strip, / this year /);
+  assert.match(strip, / today /);
+});
+
+test('the tab strip says how to move between tabs', () => {
+  const output = renderLibrary(rollup([session({ hours: 4 })]), null, {
+    ...CTX,
+    tabs: ['all', 'today'],
+  });
+
+  assert.match(output, /tab \/ shift-tab/);
+});
+
+test('with tabs on screen the header does not repeat the window', () => {
+  const output = renderLibrary(rollup([session({ hours: 4 })]), null, {
+    ...CTX,
+    window: 'today',
+    tabs: ['all', 'today'],
+  });
+
+  const title = output.split('\n')[0] ?? '';
+
+  assert.equal(title, 'PLAYTIME');
+});
+
+test('stacked counting is still called out when tabs replace the window label', () => {
+  const output = renderLibrary(rollup([session({ hours: 4 })]), null, {
+    ...CTX,
+    count: 'stacked',
+    tabs: ['all', 'today'],
+  });
+
+  assert.match(output.split('\n')[0] ?? '', /stacked/);
+});
+
+test('a detail view gets the same tab strip', () => {
+  const output = renderDetail('~/work/api', rollup([session({ hours: 6 })]), {
+    ...CTX,
+    tabs: ['all', 'today'],
+  });
+
+  assert.match(output, /\[all time\]/);
+});
+
 test('the header names the window being shown', () => {
   assert.match(renderLibrary(rollup([]), null, { ...CTX, window: 'week' }), /past 7 days/);
   assert.match(renderLibrary(rollup([]), null, { ...CTX, window: 'today' }), /today/);

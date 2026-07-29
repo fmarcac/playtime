@@ -6,7 +6,9 @@ Steam tells you that you have 412 hours in a game and which ones you played this
 week. Nothing does that for agent harnesses. Playtime does.
 
 ```
-PLAYTIME                                                        all time
+PLAYTIME
+
+  [all time]  this year   this month   today        tab / shift-tab · q quits
 
                      open   agent busy    last used
   Claude Code    386h 04m   141h 22m 36%      today
@@ -81,8 +83,8 @@ playtime config set count stacked     # or pass --stacked for one run
 ## Commands
 
 ```
-playtime                     everything, all time
-playtime today|week|month    narrow to a window
+playtime                     everything, opening on all time
+playtime today|month|year    open on one window (week works too)
 playtime <project>           drill into one project
 playtime harness <name>      drill into claude-code, codex or opencode
 playtime statusline          one compact line for status bars
@@ -92,15 +94,27 @@ playtime doctor              check hooks, daemon and stored history
 playtime daemon              start the tracker if it is not running
 ```
 
-Add `--json` to any report. `--stacked` and `--wallclock` override the counting
-mode for a single run.
+Every report opens with a tab strip: **all time**, **this year**, **this month**
+and **today**. Tab moves forward, shift-tab moves back, the arrow keys do the
+same, and `q` quits leaving the last tab on screen. Today, the month and the
+year are calendar periods, so they reset on the boundary rather than trailing a
+rolling 30 days. `week` is still available by name and stays a rolling seven
+days; ask for it and it joins the strip.
+
+Piped, redirected or with `--json`, a report prints one static block with no
+tabs, so scripts and hooks see exactly what they did before. Add `--json` to any
+report. `--stacked` and `--wallclock` override the counting mode for a single
+run.
 
 ## ccstatusline
 
 ```sh
 $ playtime statusline
-4h12m open · 1h07m busy
+412h18m open · 96h30m busy
 ```
+
+It reports **all time** by default, the way Steam shows hours in a game. For a
+shorter horizon, `playtime config set statusline.window today` or `week`.
 
 Add a **Custom Command** widget in ccstatusline's editor, or append this to a
 line in `~/.config/ccstatusline/settings.json`:
@@ -129,15 +143,16 @@ status bars, `playtime statusline --json` emits the same numbers structured.
 
 `playtime config` in a terminal opens an interactive settings screen. Arrow
 keys move, left and right cycle a setting with fixed choices, enter types a
-value, `r` resets one, `q` saves and quits. It redraws its own block rather than
-taking over the screen, so it scrolls with your scrollback and works over ssh.
+value, `r` resets one, `q` saves and quits. Escape throws the edits away, asking
+first if there are any. It redraws its own block rather than taking over the
+screen, so it scrolls with your scrollback and works over ssh.
 
 ```
-  > count              wallclock                 how overlapping sessions are totalled ←→
+  > count              wallclock                 deduplicate sessions open at the same time ←→
     statusline.format  {open} open · {busy} busy  template for the status line
-    statusline.window  today                     period the status line reports
+    statusline.window  allTime                   period the status line reports
 
-  ↑↓ move   ←→ change   enter type a value   r reset   q save and quit
+  ↑↓ move   ←→ change   enter type a value   r reset   q save   esc discard
 ```
 
 Piped or scripted it prints a plain listing instead, and
@@ -145,9 +160,9 @@ Piped or scripted it prints a plain listing instead, and
 
 | Setting | Default | Does |
 |---|---|---|
-| `count` | `wallclock` | `wallclock` dedupes overlapping sessions, `stacked` adds them up |
+| `count` | `wallclock` | deduplicate sessions open at the same time: `wallclock` counts an overlapping hour once, `stacked` counts it per session |
 | `statusline.format` | `{open} open · {busy} busy` | status line template |
-| `statusline.window` | `today` | period the bare tokens report |
+| `statusline.window` | `allTime` | period the bare tokens report: `allTime`, `today` or `week` |
 | `projects.limit` | `12` | project rows under Hours used |
 | `daemon.tickMs` | `15000` | how often liveness is sampled |
 | `daemon.idleExitMs` | `120000` | how long the daemon lingers when idle |

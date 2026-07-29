@@ -74,9 +74,12 @@ export function menuLines(settings: Settings, path: string, selected = -1): stri
     '',
     ...rows,
     '',
-    '  ↑↓ move   ←→ change   enter type a value   r reset   q save and quit',
+    '  ↑↓ move   ←→ change   enter type a value   r reset   q save   esc discard',
   ];
 }
+
+/** Asked before escape throws away edits, so a stray keypress cannot lose them. */
+export const CONFIRM_DISCARD = '  Discard changes? y quits without saving, n goes back';
 
 /** The numbered, non-interactive rendering. */
 export function renderMenu(settings: Settings, path: string): string {

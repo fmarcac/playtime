@@ -24,13 +24,16 @@ export interface ViewContext {
   count: CountMode;
   projectLimit?: number | undefined;
   color?: boolean | undefined;
+  /** The windows offered as tabs. Absent when the output is not being browsed. */
+  tabs?: readonly WindowKind[] | undefined;
 }
 
 const WINDOW_LABELS: Record<WindowKind, string> = {
   all: 'all time',
   today: 'today',
   week: 'past 7 days',
-  month: 'past 30 days',
+  month: 'this month',
+  year: 'this year',
 };
 
 const DEFAULT_PROJECT_ROWS = 12;
@@ -46,14 +49,51 @@ function paint(text: string, code: string, ctx: ViewContext): string {
 }
 
 function header(title: string, right: string, ctx: ViewContext): string {
+  if (right === '') return paint(title, BOLD, ctx);
+
   const gap = Math.max(1, ctx.width - title.length - right.length);
   return `${paint(title, BOLD, ctx)}${' '.repeat(gap)}${paint(right, DIM, ctx)}`;
 }
 
-/** Stacked totals look wrong unless the view says that is what they are. */
+/**
+ * Stacked totals look wrong unless the view says that is what they are. With a
+ * tab strip on screen the window is already named there, so only the counting
+ * mode is left to say.
+ */
 function windowLabel(ctx: ViewContext): string {
+  if (ctx.tabs) return ctx.count === 'stacked' ? 'stacked' : '';
+
   const window = WINDOW_LABELS[ctx.window];
   return ctx.count === 'stacked' ? `${window} · stacked` : window;
+}
+
+const TAB_HINT = 'tab / shift-tab · q quits';
+
+/**
+ * The tab strip. The active tab is bracketed rather than only coloured, so it
+ * is still the obvious one under NO_COLOR, and every cell keeps the same width
+ * either way so the strip does not shift as tabs change.
+ */
+function tabStrip(ctx: ViewContext): string[] {
+  if (!ctx.tabs || ctx.tabs.length === 0) return [];
+
+  let plain = ' ';
+  let painted = ' ';
+
+  for (const window of ctx.tabs) {
+    const active = window === ctx.window;
+    const cell = active ? `[${WINDOW_LABELS[window]}]` : ` ${WINDOW_LABELS[window]} `;
+
+    plain += ` ${cell}`;
+    painted += ` ${paint(cell, active ? BOLD : DIM, ctx)}`;
+  }
+
+  // The hint sits beside the tabs when there is room and under them when there
+  // is not, because a strip nobody knows how to move is worse than a wrapped one.
+  const gap = ctx.width - plain.length - TAB_HINT.length;
+  if (gap < 2) return [painted, paint(`  ${TAB_HINT}`, DIM, ctx)];
+
+  return [`${painted}${' '.repeat(gap)}${paint(TAB_HINT, DIM, ctx)}`];
 }
 
 function widest(values: readonly string[]): number {
@@ -179,12 +219,20 @@ function openNow(live: LiveSnapshot, ctx: ViewContext): string[] {
   ];
 }
 
+/** Title, tab strip if there is one, and the blank line under them. */
+function heading(title: string, ctx: ViewContext): string[] {
+  const strip = tabStrip(ctx);
+  const first = header(title, windowLabel(ctx), ctx);
+
+  return strip.length > 0 ? [first, '', ...strip, ''] : [first, ''];
+}
+
 export function renderLibrary(
   data: Rollup,
   live: LiveSnapshot | null,
   ctx: ViewContext,
 ): string {
-  const lines = [header('PLAYTIME', windowLabel(ctx), ctx), ''];
+  const lines = heading('PLAYTIME', ctx);
 
   if (data.total.sessions === 0) {
     lines.push(...nothingYet(ctx));
@@ -203,7 +251,7 @@ export function renderLibrary(
 }
 
 export function renderDetail(title: string, data: Rollup, ctx: ViewContext): string {
-  const lines = [header(title, windowLabel(ctx), ctx), ''];
+  const lines = heading(title, ctx);
 
   if (data.total.sessions === 0) {
     lines.push('  No playtime recorded for this one yet.');

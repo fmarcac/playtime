@@ -237,7 +237,8 @@ Piped or scripted it prints a plain listing instead, and
 | `daemon.idleExitMs` | `120000` | how long the daemon lingers when idle |
 
 Cadence can also be overridden per run with `PLAYTIME_TICK_MS`,
-`PLAYTIME_IDLE_EXIT_MS` and `PLAYTIME_CHECKPOINT_MS`.
+`PLAYTIME_IDLE_EXIT_MS` and `PLAYTIME_CHECKPOINT_MS`. `PLAYTIME_NODE` names the
+Node binary the daemon is started with, for when it is not on `PATH`.
 
 Stored at `~/.config/playtime/config.json`, holding only what differs from the
 defaults.

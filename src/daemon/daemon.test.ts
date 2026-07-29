@@ -54,7 +54,7 @@ function envelope(hook: string, ts: number, sessionId = 'sess_1'): Envelope {
     hook,
     pid: 4242,
     pidStart: 99,
-    payload: { session_id: sessionId, cwd: '/home/dev/git/playtime' },
+    payload: { session_id: sessionId, cwd: '/home/dev/work/api' },
   };
 }
 
@@ -82,7 +82,7 @@ test('a session_start in the inbox becomes a tracked session', async () => {
 
     assert.equal(daemon.trackedCount, 1);
     const live = await readLive(paths);
-    assert.equal(live?.sessions[0]?.project, '/home/dev/git/playtime');
+    assert.equal(live?.sessions[0]?.project, '/home/dev/work/api');
     assert.equal(live?.sessions[0]?.harness, 'claude-code');
   });
 });
@@ -322,6 +322,7 @@ test('the daemon loop keeps ticking until the work is done', async () => {
       maxAdvanceMs: 1000,
       idleExitMs: 20,
       staleSessionMs: 60_000,
+      checkpointEveryMs: 60_000,
     };
 
     let probes = 0;
@@ -342,6 +343,7 @@ test('the daemon loop stops promptly when aborted', async () => {
       maxAdvanceMs: 1000,
       idleExitMs: 60_000,
       staleSessionMs: 60_000,
+      checkpointEveryMs: 60_000,
     };
 
     const controller = new AbortController();
@@ -354,5 +356,76 @@ test('the daemon loop stops promptly when aborted', async () => {
     await running;
 
     assert.equal((await readSessions(paths)).items.length, 1);
+  });
+});
+
+test('a tick that cannot write keeps the daemon alive', async () => {
+  await withTempHome(async (paths) => {
+    const clock = fakeClock(T0);
+    const daemon = await Daemon.start(paths, CONFIG, { now: clock.now, isAlive: ALIVE });
+    await appendEnvelope(paths, envelope('SessionStart', T0));
+    await daemon.tick();
+
+    // Standing in for the transient ENOSPC that killed the real daemon.
+    const { mkdir, rm } = await import('node:fs/promises');
+    await rm(paths.live, { force: true });
+    await mkdir(paths.live, { recursive: true });
+
+    clock.advance(TICK);
+    await assert.doesNotReject(daemon.tick());
+
+    await rm(paths.live, { recursive: true, force: true });
+    clock.advance(TICK);
+    await daemon.tick();
+
+    assert.equal(daemon.trackedCount, 1, 'the session survived the failed write');
+    assert.equal((await readLive(paths))?.sessions[0]?.open, 2 * TICK);
+  });
+});
+
+test('an open session reaches durable history without waiting to close', async () => {
+  await withTempHome(async (paths) => {
+    const clock = fakeClock(T0);
+    const config: DaemonConfig = { ...CONFIG, checkpointEveryMs: 2 * TICK };
+    const daemon = await Daemon.start(paths, config, { now: clock.now, isAlive: ALIVE });
+
+    await appendEnvelope(paths, envelope('SessionStart', T0));
+    for (let i = 0; i < 4; i++) {
+      clock.advance(TICK);
+      await daemon.tick();
+    }
+
+    // Losing the checkpoint entirely must not lose the hours already accrued.
+    const { rm } = await import('node:fs/promises');
+    await rm(paths.live, { force: true });
+
+    const stored = await readSessions(paths);
+    assert.equal(stored.items.length, 1);
+    assert.ok(
+      total(stored.items[0]?.open ?? []) >= 3 * TICK,
+      `expected accrued time in history, got ${total(stored.items[0]?.open ?? [])}`,
+    );
+  });
+});
+
+test('a checkpointed session is not counted twice after a restart', () => {
+  // The successor reads the checkpoint from history and also restores the same
+  // session from the snapshot, so it must not credit both copies.
+  const clock = fakeClock(T0);
+  return withTempHome(async (paths) => {
+    const config: DaemonConfig = { ...CONFIG, checkpointEveryMs: TICK };
+    const first = await Daemon.start(paths, config, { now: clock.now, isAlive: ALIVE });
+    await appendEnvelope(paths, envelope('SessionStart', T0));
+    clock.advance(TICK);
+    await first.tick();
+    clock.advance(TICK);
+    await first.tick();
+
+    const second = await Daemon.start(paths, config, { now: clock.now, isAlive: ALIVE });
+    await second.tick();
+
+    const live = await readLive(paths);
+    assert.equal(live?.allTime.open, 2 * TICK);
+    assert.equal(live?.allTime.sessionTime, 2 * TICK, 'stacked totals must not double count');
   });
 });

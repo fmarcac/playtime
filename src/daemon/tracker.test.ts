@@ -24,7 +24,7 @@ function event(kind: EventKind, offsetMs: number, extra: Partial<PlaytimeEvent> 
     sessionId: 'sess_1',
     pid: 4242,
     pidStart: 99,
-    cwd: '/home/dev/git/playtime',
+    cwd: '/home/dev/work/api',
     ...extra,
   };
 }
@@ -34,7 +34,7 @@ test('a session_start opens a tracked session', () => {
   tracker.apply(event('session_start', 0));
 
   assert.equal(tracker.size, 1);
-  assert.equal(tracker.live()[0]?.project, '/home/dev/git/playtime');
+  assert.equal(tracker.live()[0]?.project, '/home/dev/work/api');
 });
 
 test('ticking accrues open time while the process is alive', () => {

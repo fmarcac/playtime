@@ -95,7 +95,7 @@ test('large counts get thousands separators', () => {
 });
 
 test('project paths under home are shown with a tilde', () => {
-  assert.equal(displayProject('/home/dev/git/playtime', '/home/dev'), '~/git/playtime');
+  assert.equal(displayProject('/home/dev/work/api', '/home/dev'), '~/work/api');
 });
 
 test('project paths outside home are shown in full', () => {

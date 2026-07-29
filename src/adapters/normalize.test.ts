@@ -17,7 +17,7 @@ function claudeCode(hook: string, payload: Record<string, unknown> = {}): Envelo
     payload: {
       session_id: 'sess_abc',
       transcript_path: '/home/dev/.claude/projects/x/sess_abc.jsonl',
-      cwd: '/home/dev/git/playtime',
+      cwd: '/home/dev/work/api',
       hook_event_name: hook,
       ...payload,
     },
@@ -30,7 +30,7 @@ test('a Claude Code SessionStart becomes a session_start', () => {
   assert.equal(result?.event, 'session_start');
   assert.equal(result?.harness, 'claude-code');
   assert.equal(result?.sessionId, 'sess_abc');
-  assert.equal(result?.cwd, '/home/dev/git/playtime');
+  assert.equal(result?.cwd, '/home/dev/work/api');
   assert.equal(result?.pid, 4242);
   assert.equal(result?.pidStart, 99);
   assert.equal(result?.ts, TS);
@@ -86,7 +86,7 @@ test('Codex uses the same hook names as Claude Code', () => {
     harness: 'codex',
     hook: 'UserPromptSubmit',
     pid: 77,
-    payload: { session_id: 'codex_1', cwd: '/home/dev/git/playtime' },
+    payload: { session_id: 'codex_1', cwd: '/home/dev/work/api' },
   };
 
   const result = normalizeEnvelope(envelope);
@@ -115,10 +115,10 @@ test('Codex reports its working directory under a different key', () => {
     ts: TS,
     harness: 'codex',
     hook: 'SessionStart',
-    payload: { session_id: 'codex_3', workdir: '/home/dev/git/playtime' },
+    payload: { session_id: 'codex_3', workdir: '/home/dev/work/api' },
   };
 
-  assert.equal(normalizeEnvelope(envelope)?.cwd, '/home/dev/git/playtime');
+  assert.equal(normalizeEnvelope(envelope)?.cwd, '/home/dev/work/api');
 });
 
 test('OpenCode session events map onto the session lifecycle', () => {
@@ -128,7 +128,7 @@ test('OpenCode session events map onto the session lifecycle', () => {
     harness: 'opencode',
     hook,
     pid: 900,
-    payload: { sessionID: 'oc_1', directory: '/home/dev/git/playtime' },
+    payload: { sessionID: 'oc_1', directory: '/home/dev/work/api' },
   });
 
   assert.equal(normalizeEnvelope(opencode('session.created'))?.event, 'session_start');

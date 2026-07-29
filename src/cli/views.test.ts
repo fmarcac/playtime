@@ -34,7 +34,7 @@ function session(options: {
   return {
     id: `s${++counter}`,
     harness: options.harness ?? 'claude-code',
-    project: options.project ?? '/home/dev/git/playtime',
+    project: options.project ?? '/home/dev/work/api',
     start,
     end,
     open: [[start, end]],
@@ -113,16 +113,16 @@ test('harness rows show how recently the harness was used', () => {
 test('projects appear under an Hours used heading', () => {
   const output = renderLibrary(
     rollup([
-      session({ project: '/home/dev/git/playtime', hours: 8 }),
-      session({ project: '/home/dev/git/dashboard', hours: 5 }),
+      session({ project: '/home/dev/work/api', hours: 8 }),
+      session({ project: '/home/dev/work/dashboard', hours: 5 }),
     ]),
     null,
     CTX,
   );
 
   assert.match(output, /Hours used/);
-  assert.match(output, /~\/git\/playtime/);
-  assert.match(output, /~\/git\/dashboard/);
+  assert.match(output, /~\/work\/api/);
+  assert.match(output, /~\/work\/dashboard/);
 });
 
 test('the project with the most time is listed first', () => {
@@ -157,14 +157,14 @@ test('the footer explains overlap in words rather than a bare multiplier', () =>
     CTX,
   );
 
-  assert.match(output, /8h 00m of sessions fit inside that/);
-  assert.match(output, /2\.0 running at once/);
+  assert.match(output, /2\.0 sessions open at a time on average/);
+  assert.match(output, /8h 00m of session time in total/);
 });
 
 test('the overlap line is left out when nothing actually overlapped', () => {
   const output = renderLibrary(rollup([session({ hours: 4 })]), null, CTX);
 
-  assert.doesNotMatch(output, /running at once/);
+  assert.doesNotMatch(output, /at a time on average/);
 });
 
 test('the harness table is introduced by column headers', () => {
@@ -203,7 +203,7 @@ test('the footer says how much of the busy time was spent waiting on you', () =>
       {
         id: 'blocked-one',
         harness: 'claude-code',
-        project: '/home/dev/git/playtime',
+        project: '/home/dev/work/api',
         start,
         end: NOW,
         open: [[start, NOW]],
@@ -225,12 +225,12 @@ test('the waiting clause is left out when nothing ever blocked', () => {
   assert.doesNotMatch(output, /waiting on you/);
 });
 
-test('a live session is called out as now playing', () => {
+test('a live session is called out as open now', () => {
   const live = emptySnapshot([
     {
       id: 'a',
       harness: 'claude-code',
-      project: '/home/dev/git/playtime',
+      project: '/home/dev/work/api',
       startedAt: NOW - 2 * HOUR,
       open: 2 * HOUR,
       busy: 0,
@@ -240,8 +240,8 @@ test('a live session is called out as now playing', () => {
 
   const output = renderLibrary(rollup([session({ hours: 1 })]), live, CTX);
 
-  assert.match(output, /now playing/i);
-  assert.match(output, /~\/git\/playtime/);
+  assert.match(output, /open now/i);
+  assert.match(output, /~\/work\/api/);
 });
 
 test('a session whose agent is working right now says so', () => {
@@ -249,7 +249,7 @@ test('a session whose agent is working right now says so', () => {
     {
       id: 'a',
       harness: 'claude-code',
-      project: '/home/dev/git/playtime',
+      project: '/home/dev/work/api',
       startedAt: NOW - 2 * HOUR,
       open: 2 * HOUR,
       busy: HOUR,
@@ -266,15 +266,15 @@ test('the header names the window being shown', () => {
 });
 
 test('a detail view leads with the title it was given', () => {
-  const output = renderDetail('~/git/playtime', rollup([session({ hours: 6, busyHours: 2 })]), CTX);
+  const output = renderDetail('~/work/api', rollup([session({ hours: 6, busyHours: 2 })]), CTX);
 
-  assert.match(output, /~\/git\/playtime/);
+  assert.match(output, /~\/work\/api/);
   assert.match(output, /6h 00m/);
 });
 
 test('a detail view breaks the time down by harness', () => {
   const output = renderDetail(
-    '~/git/playtime',
+    '~/work/api',
     rollup([
       session({ harness: 'claude-code', hours: 6 }),
       session({ harness: 'codex', hours: 2, endsDaysAgo: 1 }),
@@ -312,7 +312,7 @@ test('stacked mode reports the wall clock underneath rather than the overlap rat
   );
 
   assert.match(output, /4h 00m of wall clock underneath/);
-  assert.doesNotMatch(output, /fit inside that/);
+  assert.doesNotMatch(output, /of session time in total/);
 });
 
 test('stacked mode also stacks the harness rows and project rows', () => {

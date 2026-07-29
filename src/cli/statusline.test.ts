@@ -72,7 +72,7 @@ test('the current project is shown when exactly one session is live', () => {
       {
         id: 'a',
         harness: 'claude-code',
-        project: '/home/dev/git/playtime',
+        project: '/home/dev/work/api',
         startedAt: 0,
         open: 2 * HOUR,
         busy: 0,
@@ -81,7 +81,7 @@ test('the current project is shown when exactly one session is live', () => {
     ],
   });
 
-  assert.equal(renderStatusline(withSession, { format: '{project}' }), 'playtime');
+  assert.equal(renderStatusline(withSession, { format: '{project}' }), 'api');
 });
 
 test('the project token is blank when nothing is live', () => {

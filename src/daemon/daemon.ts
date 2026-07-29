@@ -11,6 +11,8 @@ import { finalize } from '../core/session.js';
 import type { SessionRecord, SessionState } from '../core/session.js';
 import type { Settings } from '../core/settings.js';
 import { windowFor } from '../core/window.js';
+import { appendFile } from 'node:fs/promises';
+
 import { drainInbox } from '../store/inbox.js';
 import { readLive, writeLive } from '../store/live.js';
 import type { LiveSessionSummary, LiveSnapshot } from '../store/live.js';
@@ -24,6 +26,8 @@ export interface DaemonConfig {
   maxAdvanceMs: number;
   idleExitMs: number;
   staleSessionMs: number;
+  /** How often an open session is written to durable history before it closes. */
+  checkpointEveryMs: number;
 }
 
 export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
@@ -31,6 +35,7 @@ export const DEFAULT_DAEMON_CONFIG: DaemonConfig = {
   maxAdvanceMs: 30_000,
   idleExitMs: 120_000,
   staleSessionMs: 5 * 60_000,
+  checkpointEveryMs: 60_000,
 };
 
 export interface DaemonDeps {
@@ -70,6 +75,8 @@ export function configFromEnv(
       DEFAULT_DAEMON_CONFIG.idleExitMs,
     staleSessionMs:
       positiveNumber(env['PLAYTIME_STALE_SESSION_MS']) ?? DEFAULT_DAEMON_CONFIG.staleSessionMs,
+    checkpointEveryMs:
+      positiveNumber(env['PLAYTIME_CHECKPOINT_MS']) ?? DEFAULT_DAEMON_CONFIG.checkpointEveryMs,
   };
 }
 
@@ -80,6 +87,7 @@ export class Daemon {
   readonly #tracker: Tracker;
   readonly #history: SessionRecord[];
   #emptySince: number | null = null;
+  #lastCheckpoint = 0;
 
   private constructor(
     paths: Paths,
@@ -111,23 +119,61 @@ export class Daemon {
     return new Daemon(paths, config, deps, tracker, history);
   }
 
-  /** One pass: ingest, probe, persist, snapshot. */
+  /**
+   * One pass: ingest, probe, persist, snapshot.
+   *
+   * A tracker that dies because one write failed is worse than useless, since
+   * every hour it was holding goes with it. Failures are logged and the loop
+   * carries on, and the next checkpoint repairs whatever did not reach disk.
+   */
   async tick(): Promise<SessionRecord[]> {
     const now = this.#deps.now();
+    let closed: SessionRecord[] = [];
 
-    const drained = await drainInbox(this.#paths);
-    for (const envelope of drained.items) {
-      const event = normalizeEnvelope(envelope);
-      if (event) this.#tracker.apply(event);
+    try {
+      const drained = await drainInbox(this.#paths);
+      for (const envelope of drained.items) {
+        const event = normalizeEnvelope(envelope);
+        if (event) this.#tracker.apply(event);
+      }
+
+      closed = this.#tracker.tick(now, this.#deps.isAlive);
+      await this.#record(closed);
+      await this.#checkpoint(now);
+    } catch (error) {
+      await this.#report('tick', error);
     }
 
-    const closed = this.#tracker.tick(now, this.#deps.isAlive);
-    await this.#record(closed);
-
     this.#emptySince = this.#tracker.size > 0 ? null : (this.#emptySince ?? now);
-    await this.#writeSnapshot(now);
+
+    try {
+      await this.#writeSnapshot(now);
+    } catch (error) {
+      await this.#report('snapshot', error);
+    }
 
     return closed;
+  }
+
+  /**
+   * Writes what open sessions have accrued so far.
+   *
+   * Without this, a session's hours live only in the snapshot until it closes,
+   * so losing that one file loses an entire day of a long session.
+   */
+  async #checkpoint(now: number): Promise<void> {
+    if (now - this.#lastCheckpoint < this.#config.checkpointEveryMs) return;
+    this.#lastCheckpoint = now;
+
+    const open = this.#tracker.live().map((state) => finalize(state, state.lastAlive));
+    if (open.length > 0) await appendSessions(this.#paths, open);
+  }
+
+  async #report(stage: string, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    await appendFile(this.#paths.log, `${new Date(this.#deps.now()).toISOString()} ${stage}: ${message}\n`, 'utf8').catch(
+      () => undefined,
+    );
   }
 
   get shouldExit(): boolean {
@@ -157,7 +203,16 @@ export class Daemon {
     // Live sessions are finalized at their last confirmed-alive moment, never at
     // `now`, so an unresponsive harness cannot inflate the reported totals.
     const provisional = tracking.map((state) => finalize(state, state.lastAlive));
-    const everything = [...this.#history, ...provisional];
+
+    // A session still open may already have a checkpoint sitting in history from
+    // an earlier daemon. The live copy is the newer of the two, so drop the
+    // stored one rather than counting the session twice.
+    const superseded = new Set(provisional.map((record) => `${record.id}#${record.start}`));
+    const settled = this.#history.filter(
+      (record) => !superseded.has(`${record.id}#${record.start}`),
+    );
+
+    const everything = [...settled, ...provisional];
 
     const snapshot: LiveSnapshot = {
       v: 1,

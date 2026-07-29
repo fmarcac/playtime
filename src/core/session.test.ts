@@ -19,7 +19,7 @@ function event(kind: EventKind, offsetMs: number, extra: Partial<PlaytimeEvent> 
     sessionId: 'sess_1',
     pid: 4242,
     pidStart: 99,
-    cwd: '/home/dev/git/playtime',
+    cwd: '/home/dev/work/api',
     ...extra,
   };
 }
@@ -47,7 +47,7 @@ test('createSession records harness, project and process identity', () => {
 
   assert.equal(state.id, 'sess_1');
   assert.equal(state.harness, 'claude-code');
-  assert.equal(state.project, '/home/dev/git/playtime');
+  assert.equal(state.project, '/home/dev/work/api');
   assert.equal(state.pid, 4242);
   assert.equal(state.pidStart, 99);
   assert.equal(state.startedAt, T0);
@@ -199,7 +199,7 @@ test('finalize reports the span from first start to last observed moment', () =>
   assert.equal(record.start, T0);
   assert.equal(record.end, T0 + 45 * SECOND);
   assert.equal(record.id, 'sess_1');
-  assert.equal(record.project, '/home/dev/git/playtime');
+  assert.equal(record.project, '/home/dev/work/api');
 });
 
 test('finalize never reports more busy time than open time', () => {

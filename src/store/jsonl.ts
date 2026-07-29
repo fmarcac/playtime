@@ -1,6 +1,6 @@
 /** Append-only JSON Lines helpers. A corrupt line is skipped and counted, never fatal. */
 
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export interface ReadResult<T> {
@@ -59,6 +59,11 @@ export async function writeAtomic(file: string, text: string): Promise<void> {
   await mkdir(dirname(file), { recursive: true });
 
   const staging = `${file}.writing.${process.pid}`;
-  await writeFile(staging, text, 'utf8');
-  await rename(staging, file);
+  try {
+    await writeFile(staging, text, 'utf8');
+    await rename(staging, file);
+  } catch (error) {
+    await rm(staging, { force: true });
+    throw error;
+  }
 }

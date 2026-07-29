@@ -70,7 +70,7 @@ function envelope(hook: string, pid: number): Envelope {
     harness: 'claude-code',
     hook,
     pid,
-    payload: { session_id: 'sess_live', cwd: '/home/dev/git/playtime' },
+    payload: { session_id: 'sess_live', cwd: '/home/dev/work/api' },
   };
 }
 

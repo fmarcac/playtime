@@ -24,7 +24,7 @@ function session(options: {
   return {
     id: `sess_${++counter}`,
     harness: options.harness ?? 'claude-code',
-    project: options.project ?? '/home/dev/git/playtime',
+    project: options.project ?? '/home/dev/work/api',
     start: from,
     end: to,
     open: [[from, to]],
@@ -52,7 +52,7 @@ test('a single session rolls up into its harness and its project', () => {
   assert.equal(result.harnesses.length, 1);
   assert.equal(result.harnesses[0]?.harness, 'claude-code');
   assert.equal(result.harnesses[0]?.open, 2 * HOUR);
-  assert.equal(result.projects[0]?.project, '/home/dev/git/playtime');
+  assert.equal(result.projects[0]?.project, '/home/dev/work/api');
   assert.equal(result.projects[0]?.open, 2 * HOUR);
 });
 

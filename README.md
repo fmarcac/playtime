@@ -14,15 +14,15 @@ PLAYTIME                                                        all time
   OpenCode         4h 23m     1h 02m 23%  2 weeks ago
 
   Hours used
-    ~/git/playtime           88h 12m  ██████████████████
-    ~/git/dashboard       63h 40m  █████████████
-    ~/infra               41h 05m  ████████
+    ~/work/api          88h 12m  ██████████████████
+    ~/work/dashboard    63h 40m  █████████████
+    ~/work/infra        41h 05m  ████████
 
   412h 18m open, agent working 148h 33m of it (36%), 9h 12m of that waiting on you
-  2,910h of sessions fit inside that, 1.4 running at once
+  1.4 sessions open at a time on average, 2,910h of session time in total
   2,481 turns
 
-  now playing  Claude Code  ~/git/playtime  2h 14m · working
+  open now  Claude Code  ~/work/api  2h 14m · working
 ```
 
 ## Install

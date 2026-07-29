@@ -155,8 +155,8 @@ function footer(totals: Totals, ctx: ViewContext): string[] {
   if (overlap > 1.05) {
     lines.push(
       ctx.count === 'stacked'
-        ? `${formatDuration(totals.open)} of wall clock underneath, ${overlap.toFixed(1)} running at once`
-        : `${formatDuration(totals.sessionTime)} of sessions fit inside that, ${overlap.toFixed(1)} running at once`,
+        ? `${overlap.toFixed(1)} sessions open at a time on average, ${formatDuration(totals.open)} of wall clock underneath`
+        : `${overlap.toFixed(1)} sessions open at a time on average, ${formatDuration(totals.sessionTime)} of session time in total`,
     );
   }
 
@@ -165,7 +165,7 @@ function footer(totals: Totals, ctx: ViewContext): string[] {
   return lines.map((line) => paint(`  ${line}`, DIM, ctx));
 }
 
-function nowPlaying(live: LiveSnapshot, ctx: ViewContext): string[] {
+function openNow(live: LiveSnapshot, ctx: ViewContext): string[] {
   if (live.sessions.length === 0) return [];
 
   return [
@@ -174,7 +174,7 @@ function nowPlaying(live: LiveSnapshot, ctx: ViewContext): string[] {
       const label = HARNESS_LABELS[session.harness];
       const project = displayProject(session.project, ctx.home);
       const state = session.busyNow ? ' · working' : '';
-      return `  ${paint('now playing', GREEN, ctx)}  ${label}  ${project}  ${formatDuration(session.open)}${state}`;
+      return `  ${paint('open now', GREEN, ctx)}  ${label}  ${project}  ${formatDuration(session.open)}${state}`;
     }),
   ];
 }
@@ -188,7 +188,7 @@ export function renderLibrary(
 
   if (data.total.sessions === 0) {
     lines.push(...nothingYet(ctx));
-    if (live) lines.push(...nowPlaying(live, ctx));
+    if (live) lines.push(...openNow(live, ctx));
     return `${lines.join('\n')}\n`;
   }
 
@@ -197,7 +197,7 @@ export function renderLibrary(
   lines.push(...projectRows(data.projects, ctx));
   lines.push('', ...footer(data.total, ctx));
 
-  if (live) lines.push(...nowPlaying(live, ctx));
+  if (live) lines.push(...openNow(live, ctx));
 
   return `${lines.join('\n')}\n`;
 }

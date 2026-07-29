@@ -34,7 +34,7 @@ function record(id: string, from: number, to: number): SessionRecord {
   return {
     id,
     harness: 'claude-code',
-    project: '/home/dev/git/playtime',
+    project: '/home/dev/work/api',
     start: from,
     end: to,
     open: [[from, to]],
@@ -213,7 +213,7 @@ test('the live snapshot round trips', async () => {
         {
           id: 'sess_1',
           harness: 'claude-code',
-          project: '/home/dev/git/playtime',
+          project: '/home/dev/work/api',
           pid: 42,
           pidStart: 7,
           startedAt: 1000,
@@ -231,7 +231,7 @@ test('the live snapshot round trips', async () => {
         {
           id: 'sess_1',
           harness: 'claude-code',
-          project: '/home/dev/git/playtime',
+          project: '/home/dev/work/api',
           startedAt: 1000,
           open: 4000,
           busy: 1000,
@@ -343,5 +343,44 @@ test('a lock file corrupted on disk does not wedge the daemon out forever', asyn
     const handle = await acquireLock(paths, { pid: 7, startedAt: 700 }, () => true);
 
     assert.ok(handle);
+  });
+});
+
+test('a failed atomic write leaves no temporary file behind', async () => {
+  await withTempHome(async (paths) => {
+    // Renaming onto a directory fails, standing in for any mid-write failure.
+    const target = join(paths.home, 'snapshot.json');
+    await mkdir(target, { recursive: true });
+
+    await assert.rejects(writeAtomic(target, '{"ok":true}'));
+
+    const { readdir } = await import('node:fs/promises');
+    const leftovers = (await readdir(paths.home)).filter((name) => name.includes('.writing.'));
+    assert.deepEqual(leftovers, []);
+  });
+});
+
+test('a session rewritten later supersedes its earlier checkpoint', async () => {
+  await withTempHome(async (paths) => {
+    // The daemon checkpoints a long session, then writes it again when it closes.
+    await appendSessions(paths, [record('long', 1000, 5000)]);
+    await appendSessions(paths, [{ ...record('long', 1000, 9000), open: [[1000, 9000]] }]);
+
+    const result = await readSessions(paths);
+
+    assert.equal(result.items.length, 1);
+    assert.deepEqual(result.items[0]?.open, [[1000, 9000]]);
+  });
+});
+
+test('a session id reused by a later run is kept separate', async () => {
+  await withTempHome(async (paths) => {
+    // Harnesses reuse session ids when a session is resumed, and that time is real.
+    await appendSessions(paths, [record('reused', 1000, 2000)]);
+    await appendSessions(paths, [record('reused', 50_000, 60_000)]);
+
+    const result = await readSessions(paths);
+
+    assert.equal(result.items.length, 2);
   });
 });

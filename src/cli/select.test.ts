@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { selectProject } from './select.js';
 
 const PROJECTS = [
-  '/home/dev/git/playtime',
-  '/home/dev/git/dashboard',
+  '/home/dev/work/api',
+  '/home/dev/work/dashboard',
   '/home/dev/infra',
-  '/opt/playtime-experiments',
+  '/opt/api-experiments',
 ];
 
 test('an exact path selects that project', () => {
@@ -18,35 +18,35 @@ test('an exact path selects that project', () => {
 });
 
 test('a basename selects the project even when the word appears elsewhere', () => {
-  // Both `/home/dev/git/playtime` and `/opt/playtime-experiments` contain
-  // "playtime", but only one is actually named it.
-  assert.deepEqual(selectProject('playtime', PROJECTS), {
+  // Both `/home/dev/work/api` and `/opt/api-experiments` contain
+  // "api", but only one is actually named it.
+  assert.deepEqual(selectProject('api', PROJECTS), {
     kind: 'one',
-    project: '/home/dev/git/playtime',
+    project: '/home/dev/work/api',
   });
 });
 
 test('a substring selects when no basename matches', () => {
-  assert.deepEqual(selectProject('jeopard', PROJECTS), {
+  assert.deepEqual(selectProject('dashb', PROJECTS), {
     kind: 'one',
-    project: '/home/dev/git/dashboard',
+    project: '/home/dev/work/dashboard',
   });
 });
 
 test('matching is case insensitive', () => {
-  assert.deepEqual(selectProject('REFORGER', PROJECTS), {
+  assert.deepEqual(selectProject('INFRA', PROJECTS), {
     kind: 'one',
     project: '/home/dev/infra',
   });
 });
 
 test('an ambiguous filter returns every candidate', () => {
-  const result = selectProject('git', PROJECTS);
+  const result = selectProject('work', PROJECTS);
 
   assert.equal(result.kind, 'many');
   assert.deepEqual(result.kind === 'many' ? result.matches : [], [
-    '/home/dev/git/playtime',
-    '/home/dev/git/dashboard',
+    '/home/dev/work/api',
+    '/home/dev/work/dashboard',
   ]);
 });
 
